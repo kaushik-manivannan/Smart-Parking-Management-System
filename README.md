@@ -34,9 +34,9 @@ Utilize SQL Developer to connect to the database using the PLADMIN credentials.
 ### Step 7: Grant Access to Users
 - **Grant Permissions Script** (`7_Grant_Statements.sql`): Assign appropriate access rights to PL_USER1 and PL_MANAGER1 for the tables and views.
 
-### Step 8 & 9: User and Manager Access
-- **PL_USER1 Steps** (`8_USER_STEPS.sql`): Directions for PL_USER1 to access and interact with the system.
-- **PL_MANAGER1 Steps** (`9_MANAGER_STEPS.sql`): Instructions for PL_MANAGER1 on managing and overseeing parking operations.
+### Step 8 & 9: User and Manager Views
+- **PL_USER1 Views** (`8_USER_VIEWS.sql`): Navigate to PL_USER1 to access and interact with the views.
+- **PL_MANAGER1 Views** (`9_MANAGER_VIEWS.sql`): Navigate to PL_MANAGER1 to manage and oversee parking operations.
 
 ## Conclusion
 
