@@ -53,22 +53,15 @@ CREATE OR REPLACE PACKAGE spms_slot_booking_pkg AS
     );
 
 
-
 --submit_feedback
-	PROCEDURE submit_feedback(
-		p_slot_booking_id NUMBER,
-		p_rating NUMBER,
-		p_comments VARCHAR2
-	);
+    PROCEDURE submit_feedback (
+        p_slot_booking_id NUMBER,
+        p_rating          NUMBER,
+        p_comments        VARCHAR2
+    );
 
 END spms_slot_booking_pkg;
 /
-
-
-
-
-
-
 
 CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
 
@@ -605,64 +598,71 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
             ROLLBACK;
             RAISE;
     END perform_check_out;
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	PROCEDURE submit_feedback(
-    p_slot_booking_id NUMBER,
-    p_rating NUMBER,
-    p_comments VARCHAR2
-) AS
-    v_check_in_id NUMBER;
-    v_word_count INT;
-BEGIN
+
+    PROCEDURE submit_feedback (
+        p_slot_booking_id NUMBER,
+        p_rating          NUMBER,
+        p_comments        VARCHAR2
+    ) AS
+        v_check_in_id NUMBER;
+        v_word_count  INT;
+    BEGIN
 
     -- Check if the customer has checked in
-    SELECT CHECK_IN_ID INTO v_check_in_id
-    FROM CHECK_IN
-    WHERE SLOT_BOOKING_ID = p_slot_booking_id
-    AND ROWNUM = 1;  -- Ensures only one row is returned
+        SELECT
+            check_in_id
+        INTO v_check_in_id
+        FROM
+            check_in
+        WHERE
+                slot_booking_id = p_slot_booking_id
+            AND ROWNUM = 1;  -- Ensures only one row is returned
 
     -- If no check-in record is found, print an error message
-    IF v_check_in_id IS NULL THEN
-        DBMS_OUTPUT.PUT_LINE('Error: No check-in record found for the provided booking ID. Only checked-in customers can provide feedback.');
-        RETURN;
-    END IF;
+        IF v_check_in_id IS NULL THEN
+            dbms_output.put_line('Error: No check-in record found for the provided booking ID. Only checked-in customers can provide feedback.'
+            );
+            RETURN;
+        END IF;
 
     -- Validate the rating
-    IF p_rating < 1 OR p_rating > 5 THEN
-        DBMS_OUTPUT.PUT_LINE('Error: Rating must be between 1 and 5.');
-        RETURN;
-    END IF;
+        IF p_rating < 1 OR p_rating > 5 THEN
+            dbms_output.put_line('Error: Rating must be between 1 and 5.');
+            RETURN;
+        END IF;
 
     -- Validate the comment word count
-    SELECT LENGTH(REGEXP_REPLACE(p_comments, '\s+', ' ')) - LENGTH(REPLACE(REGEXP_REPLACE(p_comments, '\s+', ' '), ' ', '')) + 1 INTO v_word_count
-    FROM DUAL;
+        SELECT
+            length(regexp_replace(p_comments, '\s+', ' ')) - length(replace(regexp_replace(p_comments, '\s+', ' '),
+                                                                            ' ',
+                                                                            '')) + 1
+        INTO v_word_count
+        FROM
+            dual;
 
-    IF v_word_count > 255 THEN
-        DBMS_OUTPUT.PUT_LINE('Error: Comments should not exceed 255 words.');
-        RETURN;
-    END IF;
+        IF v_word_count > 255 THEN
+            dbms_output.put_line('Error: Comments should not exceed 255 words.');
+            RETURN;
+        END IF;
 
     -- Insert the feedback
-    INSERT INTO FEEDBACK (FEEDBACK_ID, RATING, COMMENTS, CHECK_IN_ID)
-    VALUES (FEEDBACK_VAL.NEXTVAL, p_rating, p_comments, v_check_in_id);
+        INSERT INTO feedback (
+            feedback_id,
+            rating,
+            comments,
+            check_in_id
+        ) VALUES (
+            feedback_val.NEXTVAL,
+            p_rating,
+            p_comments,
+            v_check_in_id
+        );
 
-    DBMS_OUTPUT.PUT_LINE('Feedback submitted successfully.');
-EXCEPTION
-    WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE('Unexpected error: ' || SQLERRM);
-END submit_feedback;
-
-	
-	
-	
+        dbms_output.put_line('Feedback submitted successfully.');
+    EXCEPTION
+        WHEN OTHERS THEN
+            dbms_output.put_line('Unexpected error: ' || sqlerrm);
+    END submit_feedback;
 
 END spms_slot_booking_pkg;
 /
