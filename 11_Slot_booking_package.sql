@@ -9,6 +9,11 @@ CREATE OR REPLACE PACKAGE spms_slot_booking_pkg AS
         p_city VARCHAR
     );
 	
+	
+    -- Function to standardize Dates
+    FUNCTION flexiblenormalizetimestamp (
+        p_timestamp VARCHAR2
+    ) RETURN VARCHAR2;
  
  -- Check available slots in a specific parking lot for a given time
     FUNCTION available_slots_by_lot_and_time (
@@ -19,8 +24,8 @@ CREATE OR REPLACE PACKAGE spms_slot_booking_pkg AS
 
     PROCEDURE show_available_slots_by_lot_and_time (
         p_name       VARCHAR,
-        p_start_time TIMESTAMP,
-        p_end_time   TIMESTAMP
+        p_start_time VARCHAR,
+        p_end_time   VARCHAR
     );
 
 	-- Book a parking slot
@@ -52,7 +57,6 @@ CREATE OR REPLACE PACKAGE spms_slot_booking_pkg AS
         p_actual_end_time TIMESTAMP
     );
 
-
 --submit_feedback
     PROCEDURE submit_feedback (
         p_slot_booking_id NUMBER,
@@ -80,7 +84,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
                                                      parking_lot l
                                                 JOIN address a ON a.address_id = l.address_id
                           WHERE
-                              upper(a.city) = upper(p_city);
+                              upper(a.city) = TRIM(upper(p_city));
 
         RETURN v_cursor;
     END available_lots;
@@ -147,9 +151,9 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         END IF;
     EXCEPTION
         WHEN no_data_found THEN
-            dbms_output.put_line('No data available for the specified city: ' || p_city);
+            dbms_output.put_line('No parking slots available for the specified city: ' || p_city);
         WHEN OTHERS THEN
-            dbms_output.put_line('An unexpected error occurred: ' || sqlerrm);
+            dbms_output.put_line('An unexpected error occurred');
         -- Optionally re-raise the exception to ensure it can be logged or handled further up the call stack
             RAISE;
     END show_available_lots;
@@ -172,7 +176,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
                                                 JOIN floor        f ON pl.parking_lot_id = f.parking_lot_id
                                                 JOIN parking_slot ps ON f.floor_id = ps.floor_id
                           WHERE
-                                  pl.name = p_name
+                                  UPPER(TRIM(pl.name)) = UPPER(TRIM(p_name))
                               AND NOT EXISTS (
                                   SELECT
                                       1
@@ -187,87 +191,156 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         RETURN v_cursor;
     END available_slots_by_lot_and_time;
 
-    PROCEDURE show_available_slots_by_lot_and_time (
-        p_name       VARCHAR,
-        p_start_time TIMESTAMP,
-        p_end_time   TIMESTAMP
-    ) IS
-
-        v_cursor            SYS_REFCURSOR;
-        v_parking_slot_name VARCHAR2(50);
-        v_floor_level       VARCHAR2(50);
-        v_max_height        NUMBER;
-        v_lot_name          VARCHAR2(50);
-        v_price_per_hour    NUMBER;
-        v_duration_hours    NUMBER;
-        v_approx_cost       NUMBER;
+    FUNCTION flexiblenormalizetimestamp (
+        p_timestamp VARCHAR2
+    ) RETURN VARCHAR2 AS
+        v_normalized_timestamp TIMESTAMP WITH TIME ZONE; -- Use TIMESTAMP WITH TIME ZONE when necessary
     BEGIN
-    -- Validate time increments (on the hour or half-hour)
-        IF ( EXTRACT(MINUTE FROM p_start_time) NOT IN ( 0, 30 ) ) OR ( extract(SECOND FROM p_start_time) != 0 ) THEN
-            raise_application_error(-20014, 'Start time must be on the hour or half-hour.');
-        END IF;
+        BEGIN
+        -- Try converting using a format without time zone first
+            v_normalized_timestamp := TO_TIMESTAMP ( p_timestamp, 'DD-MM-YYYY HH12:MI AM' );
+        EXCEPTION
+            WHEN OTHERS THEN
+                BEGIN
+                -- Another format, also without time zone
+                    v_normalized_timestamp := TO_TIMESTAMP ( p_timestamp, 'YYYY-MM-DD HH12:MI AM' );
+                EXCEPTION
+                    WHEN OTHERS THEN
+                        BEGIN
+                        -- Include formats that might have full month names
+                            v_normalized_timestamp := TO_TIMESTAMP ( p_timestamp, 'YYYY-Month-DD HH12:MI AM' );
+                        EXCEPTION
+                            WHEN OTHERS THEN
+                                BEGIN
+                                -- Include different date arrangements
+                                    v_normalized_timestamp := TO_TIMESTAMP ( p_timestamp, 'MM-DD-YYYY HH12:MI AM' );
+                                EXCEPTION
+                                    WHEN OTHERS THEN
+                                        BEGIN
+                                        -- Assume time zone information is included
+                                            v_normalized_timestamp := TO_TIMESTAMP_TZ ( p_timestamp, 'YYYY-MM-DD"T"HH24:MI:SS TZH:TZM'
+                                            );
+                                        -- Return the formatted string directly here
+                                            RETURN to_char(v_normalized_timestamp AT TIME ZONE 'UTC', 'DD-MM-YYYY HH12:MI AM');
+                                        END;
+                                END;
+                        END;
+                END;
+        END;
 
-        IF ( EXTRACT(MINUTE FROM p_end_time) NOT IN ( 0, 30 ) ) OR ( extract(SECOND FROM p_end_time) != 0 ) THEN
-            raise_application_error(-20015, 'End time must be on the hour or half-hour.');
-        END IF;
-
-    -- Validate minimum duration (at least 1 hour)
-        v_duration_hours := extract(HOUR FROM ( p_end_time - p_start_time )) + round(extract(MINUTE FROM(p_end_time - p_start_time)) / 60.0
-        );
-
-        IF v_duration_hours < 1 THEN
-            raise_application_error(-20016, 'The booking duration should be at least 1 hour.');
-        END IF;
-    
-    -- Fetch available slots
-        v_cursor := available_slots_by_lot_and_time(p_name, p_start_time, p_end_time);
-    
-    -- Print column headers
-        dbms_output.put_line(rpad('Parking Slot Name', 20)
-                             || rpad('Floor Level', 30)
-                             || rpad('Max Height', 15)
-                             || rpad('Lot Name', 15)
-                             || rpad('Estimated Price', 15));
-
-        dbms_output.put_line(rpad('-', 20, '-')
-                             || rpad('-', 30, '-')
-                             || rpad('-', 15, '-')
-                             || rpad('-', 15, '-')
-                             || rpad('-', 15, '-'));
-
-    -- Display results
-        LOOP
-            FETCH v_cursor INTO
-                v_parking_slot_name,
-                v_floor_level,
-                v_max_height,
-                v_lot_name,
-                v_price_per_hour;
-            EXIT WHEN v_cursor%notfound;
-        
-        -- Calculate the approximate cost
-            v_approx_cost := v_duration_hours * v_price_per_hour;
-        
-        -- Format each column to align text and ensure the table looks tidy
-            dbms_output.put_line(lpad(v_parking_slot_name, 20)
-                                 || rpad(v_floor_level, 30)
-                                 || lpad(to_char(v_max_height, '999.99'), 15)
-                                 || lpad(v_lot_name, 15)
-                                 || lpad(to_char(v_approx_cost, 'FM99990.00'), 15));
-
-        END LOOP;
-
-    -- Close the cursor
-        CLOSE v_cursor;
+    -- Convert and return in standard 'DD-MM-YYYY HH12:MI AM' format
+    -- Since the last case directly returns, this line only executes if no time zone was involved
+        RETURN to_char(v_normalized_timestamp, 'DD-MM-YYYY HH12:MI AM');
     EXCEPTION
         WHEN OTHERS THEN
-            dbms_output.put_line('Error occurred: ' || sqlerrm);
+            raise_application_error(-20002, 'Unexpected error while normalizing timestamp: ');
+    END flexiblenormalizetimestamp;
+
+
+
+
+    PROCEDURE show_available_slots_by_lot_and_time (
+    p_name       VARCHAR,
+    p_start_time VARCHAR,
+    p_end_time   VARCHAR
+) IS
+    v_start_time TIMESTAMP;
+    v_end_time   TIMESTAMP;
+
+    v_cursor            SYS_REFCURSOR;
+    v_parking_slot_name VARCHAR2(50);
+    v_floor_level       VARCHAR2(50);
+    v_max_height        NUMBER;
+    v_lot_name          VARCHAR2(50);
+    v_price_per_hour    NUMBER;
+    v_duration_hours    NUMBER;
+    v_approx_cost       NUMBER;
+    v_lot_count         NUMBER;
+
+    -- Define an exception for invalid date formats
+    e_invalid_date_format EXCEPTION;
+    PRAGMA EXCEPTION_INIT(e_invalid_date_format, -01830); -- ORA-01830: date format picture ends before converting entire input string
+BEGIN
+    -- Attempt to convert string dates to TIMESTAMP
+    BEGIN
+        v_start_time := TO_TIMESTAMP(p_start_time, 'YYYY-MM-DD HH:MI AM');
+        v_end_time := TO_TIMESTAMP(p_end_time, 'YYYY-MM-DD HH:MI AM');
+    EXCEPTION
+        WHEN e_invalid_date_format OR VALUE_ERROR THEN
+            DBMS_OUTPUT.PUT_LINE('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
+            RETURN;
+    END;
+
+    -- Validate time increments (on the hour or half-hour)
+    IF (EXTRACT(MINUTE FROM v_start_time) NOT IN (0, 30)) THEN
+        DBMS_OUTPUT.PUT_LINE('Start time must be on the hour or half-hour.');
+        RETURN;
+    END IF;
+
+    IF (EXTRACT(MINUTE FROM v_end_time) NOT IN (0, 30)) THEN
+        DBMS_OUTPUT.PUT_LINE('End time must be on the hour or half-hour.');
+        RETURN;
+    END IF;
+
+    -- Validate minimum duration (at least 1 hour)
+    v_duration_hours := EXTRACT(HOUR FROM (v_end_time - v_start_time)) +
+                        ROUND(EXTRACT(MINUTE FROM (v_end_time - v_start_time)) / 60.0);
+	DBMS_OUTPUT.PUT_LINE('The booking duration is ' || v_duration_hours);
+    IF v_duration_hours < 1 THEN
+        DBMS_OUTPUT.PUT_LINE('The booking duration should be at least 1 hour.');
+        RETURN;
+    END IF;
+
+    -- Check if the lot name exists
+    SELECT COUNT(*) INTO v_lot_count FROM parking_lot WHERE UPPER(name) = UPPER(p_name);
+    IF v_lot_count = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Please enter the correct lot name. No lot name matched as per the input');
+        RETURN;
+    END IF;
+
+    -- Fetch available slots
+    v_cursor := available_slots_by_lot_and_time(p_name, v_start_time, v_end_time);
+
+    -- Print column headers
+    DBMS_OUTPUT.PUT_LINE(RPAD('Parking Slot Name', 20) ||
+                         RPAD('Floor Level', 30) ||
+                         RPAD('Max Height', 15) ||
+                         RPAD('Lot Name', 15) ||
+                         RPAD('Estimated Price', 15));
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', 20, '-') ||
+                         RPAD('-', 30, '-') ||
+                         RPAD('-', 15, '-') ||
+                         RPAD('-', 15, '-') ||
+                         RPAD('-', 15, '-'));
+
+    -- Display results
+    LOOP
+        FETCH v_cursor INTO v_parking_slot_name, v_floor_level, v_max_height, v_lot_name, v_price_per_hour;
+        EXIT WHEN v_cursor%NOTFOUND;
+        
+        -- Calculate the approximate cost
+        v_approx_cost := v_duration_hours * v_price_per_hour;
+        
+        -- Format each column to align text and ensure the table looks tidy
+        DBMS_OUTPUT.PUT_LINE(LPAD(v_parking_slot_name, 20) ||
+                             RPAD(v_floor_level, 30) ||
+                             LPAD(TO_CHAR(v_max_height, '999.99'), 15) ||
+                             LPAD(v_lot_name, 15) ||
+                             LPAD(TO_CHAR(v_approx_cost, 'FM99990.00'), 15));
+
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE v_cursor;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('No Data Found for lot or other error: ' || SQLERRM);
         -- Close cursor if open and error occurs
-            IF v_cursor%isopen THEN
-                CLOSE v_cursor;
-            END IF;
-            RAISE;
-    END show_available_slots_by_lot_and_time;
+        IF v_cursor%ISOPEN THEN
+            CLOSE v_cursor;
+        END IF;
+        RAISE;
+END show_available_slots_by_lot_and_time;
 
     PROCEDURE book_parking_slot (
         p_slot_name        VARCHAR,
@@ -296,13 +369,13 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         END IF;
 
     -- Validate transaction type
-        IF p_transaction_type NOT IN ( 'debit', 'credit' ) THEN
+        IF trim(lower(p_transaction_type)) NOT IN ( 'debit', 'credit' ) THEN
             raise_application_error(-20001, 'Transaction type must be "debit" or "credit".');
         END IF;
 
     -- Validate start and end time increments
-        IF ( EXTRACT(MINUTE FROM p_start_time) NOT IN ( 0, 30 ) ) OR ( extract(SECOND FROM p_start_time) != 0 ) OR ( EXTRACT(MINUTE FROM
-        p_end_time) NOT IN ( 0, 30 ) ) OR ( extract(SECOND FROM p_end_time) != 0 ) THEN
+        IF ( EXTRACT(MINUTE FROM p_start_time) NOT IN ( 0, 30 ) ) OR ( EXTRACT(MINUTE FROM
+        p_end_time) NOT IN ( 0, 30 ) ) THEN
             raise_application_error(-20002, 'Start and end times must be on the hour or half-hour.');
         END IF;
 
