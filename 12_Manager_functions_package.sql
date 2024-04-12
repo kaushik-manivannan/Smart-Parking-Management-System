@@ -1,3 +1,4 @@
+
 SET SERVEROUTPUT ON
 CLEAR SCREEN;
 
@@ -101,7 +102,7 @@ BEGIN
 
         -- Validate inputs
         IF v_name IS NULL OR v_street_address IS NULL OR v_city IS NULL OR v_state IS NULL OR v_country IS NULL OR v_zip_code IS NULL
-        OR p_pricing_per_hour IS NULL OR p_latitude IS NULL OR p_longitude IS NULL THEN
+        OR p_pricing_per_hour IS NULL THEN
             RAISE null_input;
             --raise_application_error(-20001, 'All fields are required.');
 END IF;
@@ -124,38 +125,25 @@ END IF;
         IF length(v_city) > 20 THEN
             RAISE invalid_city_length;
 END IF;
-
-        IF NOT regexp_like(v_street_address, '^[^()!@#$%^&*().?":{}|<>;~=_*/\\]+$') THEN
+        IF NOT regexp_like(v_street_address, '^.+$') THEN
             RAISE invalid_street_address;
 END IF;
 
       --Regex validation for city
-        IF NOT regexp_like(v_city, '^[A-Z]+(\s[A-Z]+)*$') THEN
+        IF NOT regexp_like(v_city, '^(?:[A-Z]+[a-z]*|\b[A-Z]\b)(?:\s(?:[A-Z]+[a-z]*|\b[A-Z]\b))*$') THEN
             RAISE invalid_city;
 END IF;
-
-        IF NOT regexp_like(v_name, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
-            RAISE invalid_name;
-END IF;
 --
-         IF NOT regexp_like(v_state, '^[A-Z]+(\s[A-Z]+)*$') THEN
-            RAISE invalid_state;
-END IF;
-
-         IF NOT regexp_like(v_country, '^[A-Z]+(\s[A-Z]+)*$') THEN
-            RAISE invalid_country;
-END IF;
-
 
 
         -- Regex validation
         IF NOT regexp_like(v_zip_code, '^\d{5}(-\d{4})?$') THEN
             RAISE invalid_zip_code;
 END IF;
-        IF p_latitude < -90.0 OR p_latitude > 90.0 THEN
+        IF p_latitude < -90 OR p_latitude > 90 THEN
             RAISE invalid_latitude;
 END IF;
-        IF p_longitude < -180.0 OR p_longitude > 180.0 THEN
+        IF p_longitude < -180 OR p_longitude > 180 THEN
             RAISE invalid_longitude;
 END IF;
         IF p_pricing_per_hour < 0 OR p_pricing_per_hour > 999.99 THEN
@@ -248,7 +236,7 @@ FROM
     parking_lot
 WHERE
         name = v_name
-  AND address_id = v_address_id;
+  AND address_id = v_next_address_id;
 
 EXCEPTION
             WHEN no_data_found THEN
@@ -340,17 +328,9 @@ WHEN null_input THEN
             dbms_output.put_line('Please provide a valid input for the fields, All fields are required');
 ROLLBACK;
 RETURN;
-WHEN invalid_state THEN
-            dbms_output.put_line('Invalid State format, accepts only alphabets');
-ROLLBACK;
-RETURN;
-WHEN invalid_country THEN
-            dbms_output.put_line('Invalid Country format, accepts only alphabets');
-ROLLBACK;
-RETURN;
 WHEN OTHERS THEN
             dbms_output.put_line('Not able to add parking lot details');
-            --RAISE; -- Re-raise the exception to the calling code
+            RAISE; -- Re-raise the exception to the calling code
 ROLLBACK;
 RETURN;
 END spms_add_parking_lot;
@@ -410,10 +390,10 @@ END IF;
 END IF;
 
         -- Regex validation for city
-        IF NOT regexp_like(v_city, '^[0-9\.,\''#&/()]+$') THEN
+        /*IF NOT regexp_like(v_city, '^[0-9\.,\''#&/()]+$') THEN
             RAISE invalid_city;
             --raise_application_error(-20007, 'Invalid city format.');
-END IF;
+END IF;*/
 
         -- Regex validation for zip code
         IF NOT regexp_like(v_zip_code, '^\d{5}(-\d{4})?$') THEN
@@ -558,10 +538,10 @@ END IF;
             RAISE invalid_street_address;
             --raise_application_error(-20006, 'Invalid street address format.');
 END IF;
-        IF NOT regexp_like(v_city, '^[0-9\.,\''#&/()]+$') THEN
+        /*IF NOT regexp_like(v_city, '^[0-9\.,\''#&/()]+$') THEN
             RAISE invalid_city;
             --raise_application_error(-20007, 'Invalid city format.');
-END IF;
+END IF;*/
         IF NOT regexp_like(v_zip_code, '^\d{5}(-\d{4})?$') THEN
             RAISE invalid_zip_code;
             --raise_application_error(-20008, 'Invalid zip code format.');
@@ -649,46 +629,23 @@ END spms_add_parking_slot;
 END spms_manager_management_pkg;
 /
 
--------------- parking lot Validation cases ----------------
-
--- --null check
--- -- parking lot null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('', '123 Main St','Boston', 'Massachusetts', 'United States', '12345-2344', 40.7128, -74.0060, 10.50);
--- -- stree addr null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '','Boston', 'Massachusetts', 'United States', '12345-2344', 40.7128, -74.0060, 10.50);
--- -- state null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','', 'Massachusetts', 'United States', '12345-2344',1, -49.0, 10.0);
--- -- city null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','lksalk', '', 'United States', '12345-2344',1, -49.0, 10.0);
--- -- zip code null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','lksalk', 'dkdk', 'United States', NULL,1, -49.0, 10.0);
--- -- country null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','lksalk', 'dkdk', '', '12345-2344',1, -49.0, 10.0);
--- -- latitude null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','Boston', 'Massachusetts', 'United States', '12345-2344',NULL , -74.0060, 10.50);
--- -- longitude null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','Boston', 'Massachusetts', 'United States', '12345-2344',1, NULL, 10.50);
--- -- pricing per hour null
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','Boston', 'Massachusetts', 'United States', '12345-2344',1, -49.0, NULL);
+-- Test cases for spms_add_parking_lot procedure
+-- EXEC spms_manager_management_pkg.spms_add_parking_lot('Parking Lot 1', '123 Main St','City Aa', 'State A', 'Country A', '12345', 40.7128, -74.0060, 10.50);
+-- EXEC spms_manager_management_pkg.spms_add_parking_lot('Parking Lot 2', '456 Elm St', 'City B', 'State B', 'Country B', '67890', 34.0522, -118.2437, 12.75);
+-- EXEC spms_manager_management_pkg.spms_add_parking_lot('Parking Lot 3', '789 Oak St', 'City C', 'State C', 'Country C', '98765', 51.5074, -0.1278, 8.25);
+-- EXEC spms_manager_management_pkg.spms_add_parking_lot('Parking Lot 4', '321 Pine St', 'City D', 'State D', 'Country D', '54321', 48.8566, 2.3522, 9.00);
 --
 --
+-- -- Test cases for spms_add_floor procedure
+-- EXEC spms_manager_management_pkg.spms_add_floor('Parking Lot 1', '123 Main St', 'City A', '12345', 'F1', 10.5);
+-- EXEC spms_manager_management_pkg.spms_add_floor('Parking Lot 2', '456 Elm St', 'City B', '67890', 'F2', 9.8);
+-- EXEC spms_manager_management_pkg.spms_add_floor('Parking Lot 3', '789 Oak St', 'City C', '98765', 'F3', 8.2);
+-- EXEC spms_manager_management_pkg.spms_add_floor('Parking Lot 4', '321 Pine St', 'City D', '54321', 'F4', 11.3);
+-- EXEC spms_manager_management_pkg.spms_add_floor('Parking Lot 5', '654 Cedar St', 'City E', '13579', 'F5', 12.7);
 --
--- -- special characters in state
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','Boston', 'Massachus]]etts', 'United States', '12345-2344', 12, -74.0060, 10.50);
--- -- special characters in city
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','Bos?ton', 'Massachusetts', 'United States', '12345-2344', 12, -74.0060, 10.50);
--- -- special characters in street address
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa l;kk','Boston', 'Massachusetts', 'United States', '12345-2344', 12, -74.0060, 10.50);
--- -- in country
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Center', '12 sallsa lkk','lksalk', 'dkdk', 'klklfd,mm,cz]', '12345-2344',1, -49.0, 10.0);
--- -- parking lot
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('City Cente[]r', '123 main street','Boston', 'Massachusetts', 'Uniter States', '12345-2344',1, -49.0, 10.0);
--- Invalid Zipcode
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('Parking Lot 12', '123 Main St','Boston', 'Massachusetts', 'United States', '12345-234', 40.7128, -74.0060, 10.50);
---
---
--- --Valid
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('Parking Lot 12', '123 Main St','Boston', 'Massachusetts', 'United States', '12345-2344', 89.9, 94.090, 10.50);
---
--- --Address Already Exists
--- EXEC spms_manager_management_pkg.spms_add_parking_lot('Parking Lot 12', '123 Main St','Boston', 'Massachusetts', 'United States', '12345-2344', 74.9, 95.090, 12.50);
+-- -- Test cases for spms_add_parking_slot procedure
+-- EXEC spms_manager_management_pkg.spms_add_parking_slot('Parking Lot 1', '123 Main St', 'City A', '12345', 'F1', 'SA');
+-- EXEC spms_manager_management_pkg.spms_add_parking_slot('Parking Lot 2', '456 Elm St', 'City B', '67890', 'F2', 'SB');
+-- EXEC spms_manager_management_pkg.spms_add_parking_slot('Parking Lot 3', '789 Oak St', 'City C', '98765', 'F3', 'SC');
+-- EXEC spms_manager_management_pkg.spms_add_parking_slot('Parking Lot 4', '321 Pine St', 'City D', '54321', 'F4', 'SD');
+-- EXEC spms_manager_management_pkg.spms_add_parking_slot('Parking Lot 5', '654 Cedar St', 'City E', '13579', 'F5', 'SE');
