@@ -1,5 +1,5 @@
 SET SERVEROUTPUT ON;
-SET AUTOCOMMIT OFF;
+SET AUTOCOMMIT ON;
 CREATE OR REPLACE PACKAGE spms_customer_management_pkg AS
 
 /* Creating or declaring required packages for Smart parking management system customer management. Under this Package we are creating 3 packages
