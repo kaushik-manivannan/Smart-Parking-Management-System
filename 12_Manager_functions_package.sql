@@ -355,7 +355,7 @@ ROLLBACK;
 RETURN;
 END spms_add_parking_lot;
 
-    PROCEDURE spms_add_floor (
+PROCEDURE spms_add_floor (
         p_parking_lot_name VARCHAR,
         p_street_address   VARCHAR,
         p_city             VARCHAR,
@@ -363,7 +363,6 @@ END spms_add_parking_lot;
         p_floor_level      VARCHAR,
         p_max_height       DECIMAL
     ) AS
-
         v_parking_lot_id   NUMBER;
         v_address_id       NUMBER;
         v_parking_lot_name VARCHAR(100);
@@ -371,6 +370,7 @@ END spms_add_parking_lot;
         v_city             VARCHAR(50);
         v_zip_code         VARCHAR(10);
         v_floor_level      VARCHAR(100);
+        v_floor_count      NUMBER;
 BEGIN
         -- Trim string values and convert to lowercase
         v_parking_lot_name := upper(trim(p_parking_lot_name));
@@ -380,7 +380,8 @@ BEGIN
         v_floor_level := upper(trim(p_floor_level));
 
         -- Validate inputs
-        IF v_parking_lot_name IS NULL OR v_street_address IS NULL OR v_city IS NULL OR v_zip_code IS NULL OR v_floor_level IS NULL THEN
+        IF v_parking_lot_name IS NULL OR v_street_address IS NULL OR v_city IS NULL OR v_zip_code IS NULL OR v_floor_level IS NULL
+        OR p_max_height IS NULL THEN
             RAISE null_input;
             --raise_application_error(-20005, 'Parking lot name, street address, city, zip code, and floor level are required.');
 END IF;
@@ -397,20 +398,20 @@ END IF;
         IF length(v_city) > 20 THEN
             RAISE invalid_city_length;
 END IF;
-        IF length(v_floor_level) > 20 THEN
+        IF length(v_floor_level) > 5 THEN
             RAISE invalid_floor_level_length;
 END IF;
 
+         IF NOT regexp_like(v_parking_lot_name, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
+            RAISE invalid_name;
+END IF;
 
-
-        -- Regex validation for street address
-        IF NOT regexp_like(v_street_address, '^.+$') THEN
+        IF NOT regexp_like(v_street_address, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
             RAISE invalid_street_address;
-            --raise_application_error(-20006, 'Invalid street address format.');
 END IF;
 
         -- Regex validation for city
-        IF NOT regexp_like(v_city, '^[0-9\.,\''#&/()]+$') THEN
+        IF NOT regexp_like(v_city,  '^[A-Z]+(\s[A-Z]+)*$') THEN
             RAISE invalid_city;
             --raise_application_error(-20007, 'Invalid city format.');
 END IF;
@@ -422,12 +423,17 @@ END IF;
 END IF;
 
         -- Regex validation for floor level ^[A-Za-z0-9 ]{1,5}$
-        IF NOT regexp_like(v_floor_level, '^[a-zA-Z0-9\s]{1,100}$') THEN
+        IF NOT regexp_like(v_floor_level, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
             RAISE invalid_floor_level;
             --raise_application_error(-20009, 'Invalid floor level format.');
 END IF;
 
+        IF p_max_height < 10 OR p_max_height > 15 THEN
+            RAISE invalid_max_height;
+END IF;
+
         -- Get address ID and parking lot ID
+BEGIN
 SELECT
     a.address_id,
     pl.parking_lot_id
@@ -442,8 +448,18 @@ WHERE
   AND a.city = v_city
   AND a.zip_code = v_zip_code
   AND pl.name = v_parking_lot_name;
+EXCEPTION
+                WHEN no_data_found THEN
+                    v_address_id := NULL;
+                    v_parking_lot_id:= NULL;
+END;
 
-IF v_address_id IS NULL THEN
+         IF v_address_id IS NULL and v_parking_lot_id IS NULL THEN
+            RAISE parking_lot_or_address_not_exists;
+            --raise_application_error(-20011, 'Address does not exist.');
+END IF;
+
+        IF v_address_id IS NULL THEN
             RAISE address_not_exists;
             --raise_application_error(-20011, 'Address does not exist.');
 END IF;
@@ -451,6 +467,35 @@ END IF;
             RAISE parking_lot_not_exists;
             --raise_application_error(-20012, 'Parking lot does not exist for the provided address.');
 END IF;
+
+
+BEGIN
+SELECT COUNT(*)
+INTO v_floor_count
+FROM address a
+         JOIN parking_lot pl ON a.address_id = pl.address_id
+         JOIN floor f ON pl.parking_lot_id = f.parking_lot_id
+WHERE
+        a.street_address = v_street_address
+  AND a.city = v_city
+  AND a.zip_code = v_zip_code
+  AND pl.name = v_parking_lot_name
+  AND f.floor_level = v_floor_level;
+
+IF v_floor_count > 0 THEN
+                RAISE floor_name_already_exists;
+END IF;
+
+EXCEPTION
+            WHEN no_data_found THEN
+                    v_floor_count := 0;
+
+END;
+
+    IF v_floor_count > 0 THEN
+            RAISE floor_name_already_exists;
+END IF;
+
 
         -- Insert new floor
 INSERT INTO floor (
@@ -467,37 +512,75 @@ INSERT INTO floor (
 
 COMMIT;
 EXCEPTION
-        WHEN null_input THEN
+        WHEN floor_name_already_exists THEN
+            dbms_output.put_line('Floor name already exists for the given address and parking lot');
+ROLLBACK;
+RETURN;
+WHEN invalid_max_height THEN
+            dbms_output.put_line('Invalid Max Height,range is between 10 to 15 feet');
+ROLLBACK;
+RETURN;
+WHEN parking_lot_or_address_not_exists THEN
+            dbms_output.put_line('Parking lot/Address does not exists');
+ROLLBACK;
+RETURN;
+WHEN null_input THEN
             dbms_output.put_line('Please provide a valid input for the fields, All fields are required');
+ROLLBACK;
+RETURN;
 WHEN invalid_name_length THEN
             dbms_output.put_line('Please provide a valid parking lot name, max length 50 exceeded');
+ROLLBACK;
+RETURN;
 WHEN invalid_street_address_length THEN
             dbms_output.put_line('Street address length exceeded the maximum length 50');
+ROLLBACK;
+RETURN;
 WHEN invalid_zip_code_length THEN
             dbms_output.put_line('Zip Code length exceeded the maximum length 10');
+ROLLBACK;
+RETURN;
 WHEN invalid_city_length THEN
             dbms_output.put_line('Invalid city length, max length 20');
+ROLLBACK;
+RETURN;
 WHEN invalid_floor_level_length THEN
             dbms_output.put_line('Floor level length exceeded the maximum length 5');
+ROLLBACK;
+RETURN;
 WHEN invalid_street_address THEN
             dbms_output.put_line('Invalid Street Address');
+ROLLBACK;
+RETURN;
 WHEN invalid_city THEN
             dbms_output.put_line('Invalid city format.');
+ROLLBACK;
+RETURN;
 WHEN invalid_zip_code THEN
             dbms_output.put_line('Invalid zip code format');
+ROLLBACK;
+RETURN;
 WHEN invalid_floor_level THEN
             dbms_output.put_line('Invalid floor level');
+ROLLBACK;
+RETURN;
 WHEN address_not_exists THEN
             dbms_output.put_line('Address not exists, provide valid address details');
+ROLLBACK;
+RETURN;
 WHEN invalid_name THEN
             dbms_output.put_line('Invalid Parkling lot name format');
+ROLLBACK;
+RETURN;
 WHEN parking_lot_not_exists THEN
             dbms_output.put_line('Parking does not exists, provide a valid parking lot name');
+ROLLBACK;
+RETURN;
 WHEN OTHERS THEN
-            ROLLBACK;
             dbms_output.put_line('Not able to add parking floor details');
-            RAISE;
-            --raise_application_error(-20013, 'Not able to add parking floor details');
+ROLLBACK;
+RAISE;
+RETURN;
 END spms_add_floor;
 
     PROCEDURE spms_add_parking_slot (
