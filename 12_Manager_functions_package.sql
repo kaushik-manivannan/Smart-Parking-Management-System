@@ -1,3 +1,6 @@
+SET SERVEROUTPUT ON
+CLEAR SCREEN;
+
 CREATE OR REPLACE PACKAGE spms_manager_management_pkg AS
 
         -- Declare custom exceptions for each column
