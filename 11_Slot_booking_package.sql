@@ -278,7 +278,6 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         BEGIN
             v_start_time := TO_TIMESTAMP ( p_start_time, 'YYYY-MM-DD HH:MI AM' );
             v_end_time := TO_TIMESTAMP ( p_end_time, 'YYYY-MM-DD HH:MI AM' );
-            dbms_output.put_line('The start time is done' || v_start_time);
         EXCEPTION
             WHEN OTHERS THEN
                 dbms_output.put_line('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
@@ -310,8 +309,6 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
     -- Validate minimum duration (at least 1 hour)
         v_duration_hours := extract(HOUR FROM ( v_end_time - v_start_time )) + round(extract(MINUTE FROM(v_end_time - v_start_time)) / 60.0
         );
-
-        dbms_output.put_line('The booking duration is ' || v_duration_hours);
 	
 	
     -- Calculate the duration between start time and end time in minutes
@@ -343,9 +340,9 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
 
     -- Print column headers
         dbms_output.put_line(rpad('Parking Slot Name', 20)
-                             || rpad('Floor Level', 30)
-                             || rpad('Max Height', 15)
-                             || rpad('Lot Name', 15)
+                             || rpad('Floor Level', 15)
+                             || rpad('Max Height', 16)
+                             || rpad('Lot Name', 26)
                              || rpad('Estimated Price', 15));
 
         dbms_output.put_line(rpad('-', 20, '-')
@@ -368,10 +365,10 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
             v_approx_cost := v_duration_hours * v_price_per_hour;
         
         -- Format each column to align text and ensure the table looks tidy
-            dbms_output.put_line(lpad(v_parking_slot_name, 20)
-                                 || rpad(v_floor_level, 30)
-                                 || lpad(to_char(v_max_height, '999.99'), 15)
-                                 || lpad(v_lot_name, 15)
+            dbms_output.put_line(rpad(v_parking_slot_name, 20)
+                                 || rpad(v_floor_level, 12)
+                                 || rpad(to_char(v_max_height, '999.99'), 15)
+                                 || lpad(v_lot_name, 20)
                                  || lpad(to_char(v_approx_cost, 'FM99990.00'), 15));
 
         END LOOP;
