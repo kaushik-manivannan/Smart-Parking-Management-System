@@ -278,7 +278,6 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         BEGIN
             v_start_time := TO_TIMESTAMP ( p_start_time, 'YYYY-MM-DD HH:MI AM' );
             v_end_time := TO_TIMESTAMP ( p_end_time, 'YYYY-MM-DD HH:MI AM' );
-            dbms_output.put_line('The start time is done' || v_start_time);
         EXCEPTION
             WHEN OTHERS THEN
                 dbms_output.put_line('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
@@ -310,8 +309,6 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
     -- Validate minimum duration (at least 1 hour)
         v_duration_hours := extract(HOUR FROM ( v_end_time - v_start_time )) + round(extract(MINUTE FROM(v_end_time - v_start_time)) / 60.0
         );
-
-        dbms_output.put_line('The booking duration is ' || v_duration_hours);
 	
 	
     -- Calculate the duration between start time and end time in minutes
@@ -343,9 +340,9 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
 
     -- Print column headers
         dbms_output.put_line(rpad('Parking Slot Name', 20)
-                             || rpad('Floor Level', 30)
-                             || rpad('Max Height', 15)
-                             || rpad('Lot Name', 15)
+                             || rpad('Floor Level', 15)
+                             || rpad('Max Height', 16)
+                             || rpad('Lot Name', 26)
                              || rpad('Estimated Price', 15));
 
         dbms_output.put_line(rpad('-', 20, '-')
@@ -368,10 +365,10 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
             v_approx_cost := v_duration_hours * v_price_per_hour;
         
         -- Format each column to align text and ensure the table looks tidy
-            dbms_output.put_line(lpad(v_parking_slot_name, 20)
-                                 || rpad(v_floor_level, 30)
-                                 || lpad(to_char(v_max_height, '999.99'), 15)
-                                 || lpad(v_lot_name, 15)
+            dbms_output.put_line(rpad(v_parking_slot_name, 20)
+                                 || rpad(v_floor_level, 12)
+                                 || rpad(to_char(v_max_height, '999.99'), 15)
+                                 || lpad(v_lot_name, 20)
                                  || lpad(to_char(v_approx_cost, 'FM99990.00'), 15));
 
         END LOOP;
@@ -632,7 +629,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         ) RETURNING slot_booking_id INTO v_booking_id;
 
 -- Display the slot_booking_id
-        dbms_output.put_line('Booking successful. Slot Booking ID: ' || v_booking_id);
+        dbms_output.put_line('Booking successful. Slot Booking ID: ' || v_booking_id || '. Please use this ID to check in and check out your vehicle as well as to submit your feedback.');
 
     -- Commit the transaction to save the booking and payment
         COMMIT;
@@ -855,6 +852,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         v_scheduled_end_time   TIMESTAMP;
         v_actual_start_time    TIMESTAMP;
         v_count                NUMBER;
+		v_count_1              NUMBER;
     BEGIN
         BEGIN
             v_actual_start_time := TO_TIMESTAMP ( p_actual_start_time, 'YYYY-MM-DD HH:MI AM' );
@@ -880,6 +878,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
             dbms_output.put_line('Check-in time is not within the scheduled time window.');
             RETURN;
         END IF;
+		
 
     -- Ensure there is no prior incomplete check-in (no check-out)
         SELECT
@@ -893,6 +892,21 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
 
         IF v_count > 0 THEN
             dbms_output.put_line('A check-in without a check-out already exists for this booking.');
+            RETURN;
+        END IF;
+		
+	--Ensure there is no duplicate check in 
+		SELECT
+            COUNT(*)
+        INTO v_count_1
+        FROM
+            check_in
+        WHERE
+                slot_booking_id = p_slot_booking_id
+        ;
+
+        IF v_count_1 > 0 THEN
+            dbms_output.put_line('A check-in for this slot book id has already occurred.');
             RETURN;
         END IF;
 
@@ -910,6 +924,8 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         );
 
         COMMIT;
+        -- Display success message
+        dbms_output.put_line('You have checked in successfully!');
     EXCEPTION
         WHEN no_data_found THEN
             dbms_output.put_line('Slot booking ID not found. Please provide a correct booking ID.');
@@ -981,6 +997,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
     -- Calculate additional time if actual end time is greater than scheduled end time
         IF v_actual_end_time > v_scheduled_end_time THEN
             v_additional_time := v_actual_end_time - v_scheduled_end_time;
+            dbms_output.put_line('You have checked out successfully!');
             dbms_output.put_line('Additional time: '
                                  || extract(HOUR FROM v_additional_time)
                                  || ' Hours '
