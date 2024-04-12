@@ -1,3 +1,5 @@
+SET SERVEROUTPUT ON;
+SET AUTOCOMMIT OFF;
 CREATE OR REPLACE PACKAGE spms_customer_management_pkg AS
 
 /* Creating or declaring required packages for Smart parking management system customer management. Under this Package we are creating 3 packages
@@ -19,6 +21,7 @@ CREATE OR REPLACE PACKAGE spms_customer_management_pkg AS
     value_error EXCEPTION;
     vehicle_registered_other_error EXCEPTION;
     invalid_registration_no_error EXCEPTION;  
+    duplicate_mobile_error EXCEPTION;  
 
 
   /* Procedures and Functions */
@@ -105,11 +108,11 @@ CREATE OR REPLACE PACKAGE BODY spms_customer_management_pkg AS
             RAISE invalid_name_error;
         END IF;
 
-        IF length(p_password) < 8 OR length(p_password) > 255 THEN
+        IF p_password IS NULL OR length(p_password) < 8 OR length(p_password) > 255 THEN
             RAISE value_error;
         END IF;
 
-        IF length(p_email) > 255 THEN
+        IF p_email IS NULL OR length(p_email) > 255 THEN
             RAISE invalid_email_error;
         END IF;
         IF NOT regexp_like(p_email, '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$') THEN
@@ -137,24 +140,27 @@ CREATE OR REPLACE PACKAGE BODY spms_customer_management_pkg AS
             p_mobile_no
         );
 
-        dbms_output.put_line('User inserted successfully.');
+        dbms_output.put_line('Customer added successfully.');
     EXCEPTION
         WHEN null_name_error THEN
-            dbms_output.put_line('First name and last name cannot be null.');
+            dbms_output.put_line('Error: First name and last name cannot be null.');
         WHEN empty_name_error THEN
-            dbms_output.put_line('First name and last name cannot be empty.');
+            dbms_output.put_line('Error: First name and last name cannot be empty.');
         WHEN invalid_name_error THEN
-            dbms_output.put_line('First name and last name can only contain alphabetic characters.');
+            dbms_output.put_line('Error: First name and last name can only contain alphabetic characters.');
         WHEN name_length_exceeded_error THEN
-            dbms_output.put_line('First name or last name cannot be greater than 20 characters.');
+            dbms_output.put_line('Error: First name or last name cannot be greater than 20 characters.');
         WHEN user_exists_error THEN
-            dbms_output.put_line('User with the provided email or phone number already exists.');
+            dbms_output.put_line('Error: User with the provided email or phone number already exists.');
         WHEN invalid_email_error THEN
-            dbms_output.put_line('Invalid email format or exceeds 255 characters.');
+            dbms_output.put_line('Error: Invalid email format. Email cannot be null or exceeds 255 characters or should be in the correct format.');
         WHEN value_error THEN
-            dbms_output.put_line('Password must be at least 8 characters and at most 255 characters.');
+            dbms_output.put_line('Error: Password must be at least 8 characters and at most 255 characters.');
         WHEN invalid_mobile_error THEN
-            dbms_output.put_line('Invalid mobile number format. Expected 10 digits.');
+            dbms_output.put_line('Error: Invalid mobile number format. Expected 10-12 digits.');
+        WHEN OTHERS THEN
+            dbms_output.put_line('Error: An unexpected error occurred.');
+            RAISE;
     END spms_new_customer_insert;
 
   /* Procedure to add a vehicle */
@@ -178,7 +184,7 @@ CREATE OR REPLACE PACKAGE BODY spms_customer_management_pkg AS
 
         EXCEPTION
             WHEN no_data_found THEN
-                dbms_output.put_line('No customer found with the provided email.');
+                dbms_output.put_line('Error: No customer found with the provided email.');
                 RETURN;
         END;
 
@@ -199,7 +205,6 @@ CREATE OR REPLACE PACKAGE BODY spms_customer_management_pkg AS
 
         IF
             v_existing_customer_id IS NOT NULL
-            AND v_existing_customer_id <> v_customer_id
         THEN
             RAISE vehicle_registered_other_error;
         END IF;
@@ -220,14 +225,17 @@ CREATE OR REPLACE PACKAGE BODY spms_customer_management_pkg AS
             p_registration_no,
             v_customer_id
         );
-
+        dbms_output.put_line('SUCCESS: Vehicle is added successfully to the customer');
     EXCEPTION
         WHEN no_customer_found_error THEN
-            dbms_output.put_line('No customer found with the provided Email ID.');
+            dbms_output.put_line('Error: No customer found with the provided email.');
         WHEN invalid_registration_no_error THEN
-            dbms_output.put_line('Invalid registration number format.');
+            dbms_output.put_line('Error: Invalid registration number format.');
         WHEN vehicle_registered_other_error THEN
-            dbms_output.put_line('The vehicle is already registered with another user.');
+            dbms_output.put_line('Error: The vehicle is already registered.');
+        WHEN OTHERS THEN
+            dbms_output.put_line('Error: An unexpected error occurred.');
+            RAISE;
     END spms_add_vehicle;
 
 
@@ -312,7 +320,16 @@ CREATE OR REPLACE PACKAGE BODY spms_customer_management_pkg AS
         THEN
             RAISE invalid_mobile_error;
         END IF;
+        IF p_mobile_no IS NOT NULL AND p_mobile_no != v_existing_mobile_no THEN
+        SELECT COUNT(*)
+        INTO v_count
+        FROM customer
+        WHERE mobile_no = p_mobile_no;
 
+        IF v_count > 0 THEN
+            RAISE duplicate_mobile_error;
+        END IF;
+    END IF;
         IF length(trim(p_password)) != 0 THEN
             v_new_hashed_password := hash_password(p_password);
         ELSE
@@ -332,25 +349,31 @@ CREATE OR REPLACE PACKAGE BODY spms_customer_management_pkg AS
         IF SQL%rowcount = 0 THEN
             RAISE no_customer_found_error;
         END IF;
+        dbms_output.put_line('SUCCESS: Customer is updated successfully');
     EXCEPTION
         WHEN no_data_found THEN
-            dbms_output.put_line('No customer found with the provided email.');
+            dbms_output.put_line('Error: No customer found with the provided email.');
         WHEN empty_name_error THEN
-            dbms_output.put_line('First name and last name cannot be empty.');
+            dbms_output.put_line('Error: First name and last name cannot be empty.');
         WHEN invalid_name_error THEN
-            dbms_output.put_line('First name and last name can only contain alphabetic characters.');
+            dbms_output.put_line('Error: First name and last name can only contain alphabetic characters.');
         WHEN name_length_exceeded_error THEN
-            dbms_output.put_line('First name or last name cannot be greater than 20 characters.');
+            dbms_output.put_line('Error: First name or last name cannot be greater than 20 characters.');
         WHEN user_exists_error THEN
-            dbms_output.put_line('User with the provided email already exists.');
+            dbms_output.put_line('Error: User with the provided email already exists.');
         WHEN invalid_email_error THEN
-            dbms_output.put_line('Invalid email format or exceeds 255 characters.');
+            dbms_output.put_line('Error: Invalid email format or exceeds 255 characters.');
         WHEN value_error THEN
-            dbms_output.put_line('Password must be at least 8 characters and at most 255 characters.');
+            dbms_output.put_line('Error: Password must be at least 8 characters and at most 255 characters.');
         WHEN invalid_mobile_error THEN
-            dbms_output.put_line('Invalid mobile number format. Expected 10 digits.');
+            dbms_output.put_line('Error: Invalid mobile number format. Expected 10 digits.');
         WHEN no_customer_found_error THEN
-            dbms_output.put_line('No customer found with the provided Email ID.');
+            dbms_output.put_line('Error: No customer found with the provided Email ID.');
+        WHEN duplicate_mobile_error THEN
+            dbms_output.put_line('Error: The provided phone number already exists');
+        WHEN OTHERS THEN
+            dbms_output.put_line('Error: An unexpected error occurred.');
+            RAISE;
     END spms_customer_update;
 
 END spms_customer_management_pkg;

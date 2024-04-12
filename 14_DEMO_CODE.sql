@@ -5,39 +5,41 @@ SET SERVEROUTPUT ON;
 SET AUTOCOMMIT OFF;
 --CUSTMER ONBOARDIGN AND MANAGEMENT
 
-EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen123@gmail.com','Henrick123','61739123123');
-
---
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen12@gmail.com','Henrick123q','6173932772');
--- check for duplicate
+-- Customer Creation procedure Test cases
+-- customer creation
+EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen12@gmail.com','Henrick123','8574059622');
+-- customer creation with other email but same mobile number  
+EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen123@gmail.com','Henrick123q','8574059622');
+-- check for duplicate customer with same email
 EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick1','Klassen','henrickklassen12@gmail.com','Henrick123q','6173932772');
+-- customer with invalid names
+EXEC spms_customer_management_pkg.spms_new_customer_insert ('','russ','andrerussell@gmail.com','andre123q','6173932772');
+EXEC spms_customer_management_pkg.spms_new_customer_insert ('andre12','russ','andrerussell@gmail.com','andre123q','6173932772');
+--customer with all corect values
+EXEC spms_customer_management_pkg.spms_new_customer_insert ('andre','russ','andrerussell@gmail.com','andre123q','6173932772');
+-- customer with invalid password
+EXEC spms_customer_management_pkg.spms_new_customer_insert ('mayank','yadav','mayankyadav@gmail.com','may','6173932772');
+-- customer with invalid phone-number
+EXEC spms_customer_management_pkg.spms_new_customer_insert ('mayank','yadav','mayankyadav@gmail.com','mayyank1','12abc456');
 
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('','Klassen','henrickklassen12@gmail.com','Henrick123q','6173932772');
+-- vehicle addition procedure
+-- invalid registration number
+EXEC spms_customer_management_pkg.spms_add_vehicle('<script></script>','henrickklassen12@gmail.com');
+-- add vehicle to the custumer
+EXEC spms_customer_management_pkg.spms_add_vehicle('BEE-419','henrickklassen12@gmail.com');
+-- check already the vehicle already registered
+EXEC spms_customer_management_pkg.spms_add_vehicle('BEE-419','andrerussell@gmail.com');
 
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','','henrickklassen12@gmail.com','Henrick123q','6173932772');
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','','Henrick123q','6173932772');
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen12','Henrick123q','6173932772');
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen12@gmail.com','Hen','6173932772');
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen12@gmail.com','Henrick123q','61739');
+--EXEC spms_customer_management_pkg.spms_add_vehicle('andrerussell@gmail.com');
 
-select * from customer WHERE EMAIL = 'henrickklassen12@gmail.com';
-
-EXEC PLADMIN.spms_customer_management_pkg.spms_add_vehicle('123','henrickklassen123@gmail.com');
-EXEC spms_customer_management_pkg.spms_add_vehicle('123','henrickklassen12@gmail.com'); -- CHECKING THE SAME REGISTRAN WITH OTHER USER
-EXEC spms_customer_management_pkg.spms_add_vehicle('123<','henrickklassen12@gmail.com');
-DELETE FROM VEHICLE WHERE REGISTRATION_NO = '123';
-
-SELECT * FROM VEHICLE;
-
-EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','passw', 1234567890);
-EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen1234567@gmail.com','passw', 1234567890);
-EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password', 1234560);
-
-
-
-
-
-
+-- Update the customer procedure
+-- invalid email
+EXEC spms_customer_management_pkg.spms_customer_update('','','kau@northeastern.edu','passw', 8574059622);
+--  update passowrd and phone number with alrready existing phone numer - throws error
+EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password', 6173932772);
+-- update customer with all correct values 
+EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password', 6173932773);
+--EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password');
 
 -- SLOT BOOKING MODULES:
 
