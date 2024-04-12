@@ -210,7 +210,7 @@ CREATE OR REPLACE PACKAGE BODY spms_customer_management_pkg AS
         END IF;
     
     -- Check if the registration number meets the requirements
-        IF length(p_registration_no) > 10 OR NOT regexp_like(p_registration_no, '^[a-zA-Z0-9-]{5,10}$') THEN
+        IF p_registration_no IS NULL OR length(p_registration_no) > 10 OR NOT regexp_like(p_registration_no, '^[a-zA-Z0-9-]{5,10}$') THEN
             RAISE invalid_registration_no_error;
         END IF;
 
