@@ -36,6 +36,8 @@ CREATE OR REPLACE PACKAGE spms_manager_management_pkg AS
     parking_lot_not_exists EXCEPTION;
     parking_lot_or_address_not_exists EXCEPTION;
     floor_name_already_exists EXCEPTION;
+    floor_does_not_exists EXCEPTION;
+    slot_name_already_exists EXCEPTION;
 
     PROCEDURE spms_add_parking_lot (
         p_name             VARCHAR,
@@ -129,7 +131,7 @@ END IF;
             RAISE invalid_city_length;
 END IF;
 
-        IF NOT regexp_like(v_street_address, '^[^()!@#$%^&*().?":{}|<>;~=_*/\\]+$') THEN
+        IF NOT regexp_like(v_street_address, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
             RAISE invalid_street_address;
 END IF;
 
@@ -604,6 +606,7 @@ END spms_add_floor;
         v_zip_code         VARCHAR(10);
         v_floor_level      VARCHAR(100);
         v_slot_name        VARCHAR(100);
+        v_slot_count       NUMBER;
 BEGIN
         -- Trim string values and convert to uppercase
         v_parking_lot_name := upper(trim(p_parking_lot_name));
@@ -638,13 +641,14 @@ END IF;
         IF length(v_slot_name) > 5 THEN
             RAISE invalid_slot_name_length;
 END IF;
-        IF NOT regexp_like(v_floor_level, '^[a-zA-Z0-9\s]{1,100}$') THEN
+
+
+        IF NOT regexp_like(v_floor_level, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
             RAISE invalid_floor_level;
             --raise_application_error(-20009, 'Invalid floor level format.');
 END IF;
-        IF NOT regexp_like(v_street_address, '^.+$') THEN
+        IF NOT regexp_like(v_street_address, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
             RAISE invalid_street_address;
-            --raise_application_error(-20006, 'Invalid street address format.');
 END IF;
         IF NOT regexp_like(v_city,  '^[A-Z]+(\s[A-Z]+)*$') THEN
             RAISE invalid_city;
@@ -654,24 +658,19 @@ END IF;
             RAISE invalid_zip_code;
             --raise_application_error(-20008, 'Invalid zip code format.');
 END IF;
-        IF NOT regexp_like(v_floor_level, '^[a-zA-Z0-9\s]{1,100}$') THEN
-            RAISE invalid_floor_level;
-            --raise_application_error(-20009, 'Invalid floor level format.');
-END IF;
 
                 -- Regex validation for parking slot name
-        IF NOT regexp_like(v_slot_name, '^[a-zA-Z0-9\s]{1,100}$') THEN
+        IF NOT regexp_like(v_slot_name, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
             RAISE invalid_slot_name;
             --raise_application_error(-20013, 'Invalid parking slot name format.');
 END IF;
 
-        -- Regex validation for parking lot name
-        IF NOT regexp_like(v_parking_lot_name, '^[a-zA-Z0-9\s]{1,100}$') THEN
+       IF NOT regexp_like(v_parking_lot_name, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
             RAISE invalid_name;
-            --raise_application_error(-20012, 'Invalid parking lot name format.');
 END IF;
 
         -- Get floor ID
+BEGIN
 SELECT
     f.floor_id
 INTO v_floor_id
@@ -686,8 +685,39 @@ WHERE
   AND a.zip_code = v_zip_code
   AND f.floor_level = v_floor_level;
 
-IF v_floor_id IS NULL THEN
-            raise_application_error(-20009, 'Floor does not exist for the given parking lot, address, and floor level.');
+IF v_floor_id IS NULL  THEN
+            RAISE floor_does_not_exists;
+END IF;
+
+EXCEPTION
+        WHEN no_data_found THEN
+                v_floor_id := NULL;
+
+END;
+
+        IF v_floor_id IS NULL THEN
+            raise floor_does_not_exists;
+END IF;
+
+
+BEGIN
+SELECT COUNT(*)
+INTO v_slot_count
+FROM parking_slot ps
+WHERE ps.floor_id = v_floor_id
+  AND ps.slot_name = v_slot_name;
+
+IF v_slot_count > 0 THEN
+                RAISE slot_name_already_exists;
+END IF;
+
+EXCEPTION
+            WHEN no_data_found THEN
+                v_slot_count := 0;
+END;
+
+        IF v_slot_count > 0 THEN
+                RAISE slot_name_already_exists;
 END IF;
 
         -- Insert new parking slot
@@ -703,35 +733,68 @@ INSERT INTO parking_slot (
 
 COMMIT;
 EXCEPTION
-        WHEN invalid_name_length THEN
+        WHEN slot_name_already_exists THEN
+            dbms_output.put_line('Slot name already exists for the fiven floor and parking lot');
+ROLLBACK;
+RETURN;
+WHEN floor_does_not_exists THEN
+            dbms_output.put_line('Floor/Parking lot/Address does not exists');
+ROLLBACK;
+RETURN;
+WHEN invalid_name_length THEN
             dbms_output.put_line('Please provide a valid parking lot name, max length 50 exceeded');
+ROLLBACK;
+RETURN;
 WHEN invalid_floor_level_length THEN
             dbms_output.put_line('Floor level length exceeded the maximum length 5');
+ROLLBACK;
+RETURN;
 WHEN invalid_street_address_length THEN
             dbms_output.put_line('Street address length exceeded the maximum length 50');
+ROLLBACK;
+RETURN;
 WHEN invalid_city_length THEN
             dbms_output.put_line('Invalid city length, max length 20');
+ROLLBACK;
+RETURN;
 WHEN invalid_zip_code_length THEN
             dbms_output.put_line('Zip Code length exceeded the maximum length 10');
+ROLLBACK;
+RETURN;
 WHEN invalid_slot_name_length THEN
             dbms_output.put_line('Slot name length exceeded the maximum length 5');
+ROLLBACK;
+RETURN;
 WHEN invalid_floor_level THEN
             dbms_output.put_line('Invalid floor level');
+ROLLBACK;
+RETURN;
 WHEN invalid_street_address THEN
             dbms_output.put_line('Invalid Street Address');
+ROLLBACK;
+RETURN;
 WHEN invalid_city THEN
             dbms_output.put_line('Invalid city format.');
+ROLLBACK;
+RETURN;
 WHEN invalid_zip_code THEN
             dbms_output.put_line('Invalid zip code format');
+ROLLBACK;
+RETURN;
 WHEN invalid_slot_name THEN
             dbms_output.put_line('Invalid slot name format');
+ROLLBACK;
+RETURN;
 WHEN invalid_name THEN
             dbms_output.put_line('Invalid Parkling lot name format');
+ROLLBACK;
+RETURN;
 WHEN OTHERS THEN
-            ROLLBACK;
             dbms_output.put_line('Not able to add parking slot details');
             RAISE;
-            --raise_application_error(-20013, 'Not able to add parking slot details');
+ROLLBACK;
+RETURN;
+
 END spms_add_parking_slot;
 
 END spms_manager_management_pkg;
@@ -823,8 +886,19 @@ END spms_manager_management_pkg;
 -- -- floor name already exists
 -- EXEC spms_manager_management_pkg.spms_add_floor('Parking Lot 12','123 Simon St','Boston', '20120-6007', 'F1', 10.5);
 --
-
-
-
-
-
+--
+--
+-- ----- testing for adding slot ---
+--
+-- valid
+-- EXEC spms_manager_management_pkg.spms_add_parking_slot('Parking Lot 12', '123 Simon St','Boston', '20120-6007', 'F1', 'SA');
+--
+--
+--
+-- ------- ALl Valid case --
+-- -- Adding lot/Address
+-- EXEC spms_manager_management_pkg.spms_add_parking_lot('Parking Lot 12', '123 Simon St','Boston', 'Massachusetts', 'United States', '20120-6007',89.9, 94.090, 10.50);
+-- -- Adding parkign floor
+-- EXEC spms_manager_management_pkg.spms_add_floor('Parking Lot 12','123 Simon St','Boston', '20120-6007', 'F1', '');
+-- -Adding parking slot
+-- EXEC spms_manager_management_pkg.spms_add_parking_slot('Parking Lot 12', '123 Simon St','Boston', '20120-6007', 'F1', 'SA');
