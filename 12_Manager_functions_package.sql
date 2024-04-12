@@ -21,5 +21,15 @@ CREATE OR REPLACE PACKAGE spms_manager_management_pkg AS
         p_max_height       DECIMAL
     );
 
+    PROCEDURE spms_add_parking_slot (
+        p_parking_lot_name VARCHAR,
+        p_street_address   VARCHAR,
+        p_city             VARCHAR,
+        p_zip_code         VARCHAR,
+        p_floor_level      VARCHAR,
+        p_slot_name        VARCHAR
+    );
+
+
 END spms_manager_management_pkg;
 /
