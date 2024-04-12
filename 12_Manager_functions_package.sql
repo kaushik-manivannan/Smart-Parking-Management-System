@@ -101,7 +101,7 @@ BEGIN
 
         -- Validate inputs
         IF v_name IS NULL OR v_street_address IS NULL OR v_city IS NULL OR v_state IS NULL OR v_country IS NULL OR v_zip_code IS NULL
-        OR p_pricing_per_hour IS NULL THEN
+        OR p_pricing_per_hour IS NULL OR p_latitude IS NULL OR p_longitude IS NULL THEN
             RAISE null_input;
             --raise_application_error(-20001, 'All fields are required.');
 END IF;
@@ -124,25 +124,38 @@ END IF;
         IF length(v_city) > 20 THEN
             RAISE invalid_city_length;
 END IF;
-        IF NOT regexp_like(v_street_address, '^.+$') THEN
+
+        IF NOT regexp_like(v_street_address, '^[^()!@#$%^&*().?":{}|<>;~=_*/\\]+$') THEN
             RAISE invalid_street_address;
 END IF;
 
       --Regex validation for city
-        IF NOT regexp_like(v_city, '^[A-Za-z]+(?:\s+[A-Za-z]+)*$') THEN
+        IF NOT regexp_like(v_city, '^[A-Z]+(\s[A-Z]+)*$') THEN
             RAISE invalid_city;
 END IF;
+
+        IF NOT regexp_like(v_name, '^[A-Z0-9]+(\s[A-Z0-9]+)*$') THEN
+            RAISE invalid_name;
+END IF;
 --
+         IF NOT regexp_like(v_state, '^[A-Z]+(\s[A-Z]+)*$') THEN
+            RAISE invalid_state;
+END IF;
+
+         IF NOT regexp_like(v_country, '^[A-Z]+(\s[A-Z]+)*$') THEN
+            RAISE invalid_country;
+END IF;
+
 
 
         -- Regex validation
         IF NOT regexp_like(v_zip_code, '^\d{5}(-\d{4})?$') THEN
             RAISE invalid_zip_code;
 END IF;
-        IF p_latitude < -90 OR p_latitude > 90 THEN
+        IF p_latitude < -90.0 OR p_latitude > 90.0 THEN
             RAISE invalid_latitude;
 END IF;
-        IF p_longitude < -180 OR p_longitude > 180 THEN
+        IF p_longitude < -180.0 OR p_longitude > 180.0 THEN
             RAISE invalid_longitude;
 END IF;
         IF p_pricing_per_hour < 0 OR p_pricing_per_hour > 999.99 THEN
@@ -235,7 +248,7 @@ FROM
     parking_lot
 WHERE
         name = v_name
-  AND address_id = v_next_address_id;
+  AND address_id = v_address_id;
 
 EXCEPTION
             WHEN no_data_found THEN
@@ -327,9 +340,17 @@ WHEN null_input THEN
             dbms_output.put_line('Please provide a valid input for the fields, All fields are required');
 ROLLBACK;
 RETURN;
+WHEN invalid_state THEN
+            dbms_output.put_line('Invalid State format, accepts only alphabets');
+ROLLBACK;
+RETURN;
+WHEN invalid_country THEN
+            dbms_output.put_line('Invalid Country format, accepts only alphabets');
+ROLLBACK;
+RETURN;
 WHEN OTHERS THEN
             dbms_output.put_line('Not able to add parking lot details');
-            RAISE; -- Re-raise the exception to the calling code
+            --RAISE; -- Re-raise the exception to the calling code
 ROLLBACK;
 RETURN;
 END spms_add_parking_lot;
