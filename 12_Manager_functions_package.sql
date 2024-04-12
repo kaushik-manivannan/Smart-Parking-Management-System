@@ -586,7 +586,7 @@ RETURN;
 WHEN OTHERS THEN
             dbms_output.put_line('Not able to add parking floor details');
 ROLLBACK;
-RAISE;
+--RAISE;
 RETURN;
 END spms_add_floor;
 
@@ -791,7 +791,7 @@ ROLLBACK;
 RETURN;
 WHEN OTHERS THEN
             dbms_output.put_line('Not able to add parking slot details');
-            RAISE;
+            --RAISE;
 ROLLBACK;
 RETURN;
 
@@ -799,7 +799,6 @@ END spms_add_parking_slot;
 
 END spms_manager_management_pkg;
 /
-
 
 
 
