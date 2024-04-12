@@ -507,5 +507,166 @@ WHEN OTHERS THEN
             --raise_application_error(-20013, 'Not able to add parking floor details');
 END spms_add_floor;
 
+    PROCEDURE spms_add_parking_slot (
+        p_parking_lot_name VARCHAR,
+        p_street_address   VARCHAR,
+        p_city             VARCHAR,
+        p_zip_code         VARCHAR,
+        p_floor_level      VARCHAR,
+        p_slot_name        VARCHAR
+    ) AS
+        v_floor_id         NUMBER;
+        v_parking_lot_name VARCHAR(100);
+        v_street_address   VARCHAR(100);
+        v_city             VARCHAR(100);
+        v_zip_code         VARCHAR(10);
+        v_floor_level      VARCHAR(100);
+        v_slot_name        VARCHAR(100);
+BEGIN
+        -- Trim string values and convert to uppercase
+        v_parking_lot_name := upper(trim(p_parking_lot_name));
+        v_street_address := upper(trim(p_street_address));
+        v_city := upper(trim(p_city));
+        v_zip_code := upper(trim(p_zip_code));
+        v_floor_level := upper(trim(p_floor_level));
+        v_slot_name := upper(trim(p_slot_name));
+
+        -- Validate inputs
+        IF v_parking_lot_name IS NULL OR v_street_address IS NULL
+                                         OR v_city IS NULL
+                                            OR v_zip_code IS NULL
+                                               OR v_floor_level IS NULL
+                                                  OR v_slot_name IS NULL THEN
+            raise null_input;
+            --raise_application_error(-20007, 'Parking lot name, street address, city, zip code, floor level, and slot name are required.');
+END IF;
+
+        IF LENGTH(v_parking_lot_name) > 50 THEN
+            raise invalid_name_length;
+END IF;
+
+        IF LENGTH(v_floor_level) > 20 THEN
+            raise invalid_floor_level_length;
+END IF;
+
+        IF LENGTH(v_street_address) > 50 THEN
+            raise invalid_street_address_length;
+END IF;
+
+        IF LENGTH(v_city) > 20 THEN
+            raise invalid_city_length;
+END IF;
+
+        IF LENGTH(v_zip_code) > 10 THEN
+            raise invalid_zip_code_length;
+END IF;
+
+        IF LENGTH(v_slot_name) > 5 THEN
+            raise invalid_slot_name_length;
+END IF;
+
+
+
+         IF NOT regexp_like(v_floor_level, '^[a-zA-Z0-9\s]{1,100}$') THEN
+            raise invalid_floor_level;
+            --raise_application_error(-20009, 'Invalid floor level format.');
+END IF;
+
+         IF NOT regexp_like(v_street_address, '^.+$') THEN
+            raise invalid_street_address;
+            --raise_application_error(-20006, 'Invalid street address format.');
+END IF;
+
+        IF NOT regexp_like(v_city, '^[0-9\.,\''#&/()]+$') THEN
+            raise invalid_city;
+            --raise_application_error(-20007, 'Invalid city format.');
+END IF;
+
+        IF NOT regexp_like(v_zip_code, '^\d{5}(-\d{4})?$') THEN
+            raise invalid_zip_code;
+            --raise_application_error(-20008, 'Invalid zip code format.');
+END IF;
+
+        IF NOT regexp_like(v_floor_level, '^[a-zA-Z0-9\s]{1,100}$') THEN
+            raise invalid_floor_level;
+            --raise_application_error(-20009, 'Invalid floor level format.');
+END IF;
+
+                -- Regex validation for parking slot name
+        IF NOT regexp_like(v_slot_name, '^[a-zA-Z0-9\s]{1,100}$') THEN
+            raise invalid_slot_name;
+            --raise_application_error(-20013, 'Invalid parking slot name format.');
+END IF;
+
+        -- Regex validation for parking lot name
+        IF NOT regexp_like(v_parking_lot_name, '^[a-zA-Z0-9\s]{1,100}$') THEN
+            raise invalid_name;
+            --raise_application_error(-20012, 'Invalid parking lot name format.');
+END IF;
+
+        -- Get floor ID
+SELECT
+    f.floor_id
+INTO v_floor_id
+FROM
+    floor f
+        JOIN parking_lot pl ON f.parking_lot_id = pl.parking_lot_id
+        JOIN address     a ON pl.address_id = a.address_id
+WHERE
+        pl.name = v_parking_lot_name
+  AND a.street_address = v_street_address
+  AND a.city = v_city
+  AND a.zip_code = v_zip_code
+  AND f.floor_level = v_floor_level;
+
+IF v_floor_id IS NULL THEN
+            raise_application_error(-20009, 'Floor does not exist for the given parking lot, address, and floor level.');
+END IF;
+
+        -- Insert new parking slot
+INSERT INTO parking_slot (
+    parking_slot_id,
+    floor_id,
+    slot_name
+) VALUES (
+             parking_slot_id_val.NEXTVAL,
+             v_floor_id,
+             v_slot_name
+         );
+
+COMMIT;
+EXCEPTION
+        WHEN invalid_name_length THEN
+            DBMS_OUTPUT.PUT_LINE('Please provide a valid parking lot name, max length 50 exceeded');
+WHEN invalid_floor_level_length THEN
+            DBMS_OUTPUT.PUT_LINE('Floor level length exceeded the maximum length 5');
+WHEN invalid_street_address_length THEN
+            DBMS_OUTPUT.PUT_LINE('Street address length exceeded the maximum length 50');
+WHEN invalid_city_length THEN
+            DBMS_OUTPUT.PUT_LINE('Invalid city length, max length 20');
+WHEN invalid_zip_code_length THEN
+            DBMS_OUTPUT.PUT_LINE('Zip Code length exceeded the maximum length 10');
+WHEN invalid_slot_name_length THEN
+            DBMS_OUTPUT.PUT_LINE('Slot name length exceeded the maximum length 5');
+WHEN invalid_floor_level THEN
+            DBMS_OUTPUT.PUT_LINE('Invalid floor level');
+WHEN invalid_street_address THEN
+            DBMS_OUTPUT.PUT_LINE('Invalid Street Address');
+WHEN invalid_city THEN
+            DBMS_OUTPUT.PUT_LINE('Invalid city format.');
+WHEN invalid_zip_code THEN
+            DBMS_OUTPUT.PUT_LINE('Invalid zip code format');
+WHEN invalid_slot_name THEN
+            DBMS_OUTPUT.PUT_LINE('Invalid slot name format');
+WHEN invalid_name THEN
+            DBMS_OUTPUT.PUT_LINE('Invalid Parkling lot name format');
+
+WHEN OTHERS THEN
+            ROLLBACK;
+            DBMS_OUTPUT.PUT_LINE('Not able to add parking slot details');
+            RAISE;
+            --raise_application_error(-20013, 'Not able to add parking slot details');
+END spms_add_parking_slot;
+
 END spms_manager_management_pkg;
 /
