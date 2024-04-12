@@ -12,7 +12,14 @@ CREATE OR REPLACE PACKAGE spms_manager_management_pkg AS
         p_pricing_per_hour DECIMAL
     );
 
-
+    PROCEDURE spms_add_floor (
+        p_parking_lot_name VARCHAR,
+        p_street_address   VARCHAR,
+        p_city             VARCHAR,
+        p_zip_code         VARCHAR,
+        p_floor_level      VARCHAR,
+        p_max_height       DECIMAL
+    );
 
 END spms_manager_management_pkg;
 /
