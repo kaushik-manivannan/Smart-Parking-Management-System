@@ -260,7 +260,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         v_approx_cost       NUMBER;
         v_lot_count         NUMBER;
         v_duration_minutes  NUMBER;
-
+        v_same_day          BOOLEAN;
     -- Define an exception for invalid date formats
         e_invalid_date_format EXCEPTION;
     BEGIN
@@ -274,7 +274,13 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
                 dbms_output.put_line('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
                 RETURN;
         END;
-
+		
+		-- Check if start and end times are on the same day
+        v_same_day := trunc(v_start_time) = trunc(v_end_time);
+        IF NOT v_same_day THEN
+            dbms_output.put_line('Start and end times must be on the same day.');
+            RETURN;
+        END IF;
         IF v_start_time > v_end_time THEN
             dbms_output.put_line('Start time cannot be greater than end time.');
             RETURN;
@@ -397,6 +403,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         v_lot_count        NUMBER;
         v_floor_count      NUMBER;
         v_booking_id       NUMBER;
+        v_same_day         BOOLEAN;
 		
 
     -- Define an exception for invalid date formats
@@ -412,6 +419,12 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
                 RETURN;
         END;
 
+		 -- Check if start and end times are on the same day
+        v_same_day := trunc(v_start_time) = trunc(v_end_time);
+        IF NOT v_same_day THEN
+            dbms_output.put_line('Start and end times must be on the same day.');
+            RETURN;
+        END IF;
         IF v_start_time > v_end_time THEN
             dbms_output.put_line('Start time cannot be greater than end time.');
             RETURN;
@@ -978,78 +991,88 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
     END perform_check_out;
 
     PROCEDURE submit_feedback (
-    p_slot_booking_id NUMBER,
-    p_rating          NUMBER,
-    p_comments        VARCHAR2
-) AS
-    v_check_in_id NUMBER;
-    v_word_count  INT;
-    v_feedback_exists NUMBER;
-BEGIN
+        p_slot_booking_id NUMBER,
+        p_rating          NUMBER,
+        p_comments        VARCHAR2
+    ) AS
+        v_check_in_id     NUMBER;
+        v_word_count      INT;
+        v_feedback_exists NUMBER;
+    BEGIN
 
 -- Check if the customer has checked in
-    SELECT check_in_id
-    INTO v_check_in_id
-    FROM check_in
-    WHERE slot_booking_id = p_slot_booking_id
-	AND ACTUAL_END_TIME IS NOT NULL
-    AND ROWNUM = 1;  -- Ensures only one row is returned
+        SELECT
+            check_in_id
+        INTO v_check_in_id
+        FROM
+            check_in
+        WHERE
+                slot_booking_id = p_slot_booking_id
+            AND actual_end_time IS NOT NULL
+            AND ROWNUM = 1;  -- Ensures only one row is returned
 
 -- If no check-in record is found, print an error message
-    IF v_check_in_id IS NULL THEN
-        dbms_output.put_line('No check-in record found for the provided booking ID. Only checked-in customers can provide feedback.');
-        RETURN;
-    END IF;
+        IF v_check_in_id IS NULL THEN
+            dbms_output.put_line('No check-in record found for the provided booking ID. Only checked-in customers can provide feedback.'
+            );
+            RETURN;
+        END IF;
 
 -- Check if feedback has already been provided
-    SELECT COUNT(*)
-    INTO v_feedback_exists
-    FROM feedback
-    WHERE check_in_id = v_check_in_id;
+        SELECT
+            COUNT(*)
+        INTO v_feedback_exists
+        FROM
+            feedback
+        WHERE
+            check_in_id = v_check_in_id;
 
-    IF v_feedback_exists > 0 THEN
-        dbms_output.put_line('Feedback has already been provided for this booking.');
-        RETURN;
-    END IF;
+        IF v_feedback_exists > 0 THEN
+            dbms_output.put_line('Feedback has already been provided for this booking.');
+            RETURN;
+        END IF;
 
 -- Validate the rating
-    IF p_rating < 1 OR p_rating > 5 THEN
-        dbms_output.put_line('Rating must be between 1 and 5.');
-        RETURN;
-    END IF;
+        IF p_rating < 1 OR p_rating > 5 THEN
+            dbms_output.put_line('Rating must be between 1 and 5.');
+            RETURN;
+        END IF;
 
 -- Validate the comment word count
-    SELECT length(regexp_replace(p_comments, '\s+', ' ')) - length(replace(regexp_replace(p_comments, '\s+', ' '), ' ', '')) + 1
-    INTO v_word_count
-    FROM dual;
+        SELECT
+            length(regexp_replace(p_comments, '\s+', ' ')) - length(replace(regexp_replace(p_comments, '\s+', ' '),
+                                                                            ' ',
+                                                                            '')) + 1
+        INTO v_word_count
+        FROM
+            dual;
 
-    IF v_word_count > 255 THEN
-        dbms_output.put_line('Comments should not exceed 255 words.');
-        RETURN;
-    END IF;
+        IF v_word_count > 255 THEN
+            dbms_output.put_line('Comments should not exceed 255 words.');
+            RETURN;
+        END IF;
 
 -- Insert the feedback
-    INSERT INTO feedback (
-        feedback_id,
-        rating,
-        comments,
-        check_in_id
-    ) VALUES (
-        FEEDBACK_VAL.NEXTVAL, 
-        p_rating,
-        p_comments,
-        v_check_in_id
-    );
+        INSERT INTO feedback (
+            feedback_id,
+            rating,
+            comments,
+            check_in_id
+        ) VALUES (
+            feedback_val.NEXTVAL,
+            p_rating,
+            p_comments,
+            v_check_in_id
+        );
 
-    COMMIT;  -- Ensure changes are committed
+        COMMIT;  -- Ensure changes are committed
 
-    dbms_output.put_line('Feedback submitted successfully.');
-
-EXCEPTION
-    WHEN OTHERS THEN
-        dbms_output.put_line('Unexpected error: ' );
-        ROLLBACK;  -- Rollback changes on error
-END submit_feedback;
+        dbms_output.put_line('Feedback submitted successfully.');
+    EXCEPTION
+        WHEN OTHERS THEN
+            dbms_output.put_line('Unexpected error: ');
+            ROLLBACK;  -- Rollback changes on error
+    END submit_feedback;
 
 END spms_slot_booking_pkg;
 /
