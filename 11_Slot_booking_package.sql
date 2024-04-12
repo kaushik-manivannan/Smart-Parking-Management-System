@@ -34,8 +34,8 @@ CREATE OR REPLACE PACKAGE spms_slot_booking_pkg AS
         p_floor_level      VARCHAR,
         p_lot_name         VARCHAR,
         p_vehicle_reg_no   VARCHAR,
-        p_start_time       TIMESTAMP,
-        p_end_time         TIMESTAMP,
+        p_start_time       VARCHAR,
+        p_end_time         VARCHAR,
         p_transaction_type VARCHAR,
         p_amount           NUMBER
     );
@@ -45,16 +45,22 @@ CREATE OR REPLACE PACKAGE spms_slot_booking_pkg AS
         p_email VARCHAR
     );
 
+-- cancel booking
+    PROCEDURE cancel_booking (
+        p_booking_id         NUMBER,
+        cancel_initiate_time VARCHAR
+    );
+
 -- Check-in procedure
     PROCEDURE perform_check_in (
         p_slot_booking_id   NUMBER,
-        p_actual_start_time TIMESTAMP
+        p_actual_start_time VARCHAR
     );
 
 --check-out procedure
     PROCEDURE perform_check_out (
         p_slot_booking_id NUMBER,
-        p_actual_end_time TIMESTAMP
+        p_actual_end_time VARCHAR
     );
 
 --submit_feedback
@@ -176,7 +182,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
                                                 JOIN floor        f ON pl.parking_lot_id = f.parking_lot_id
                                                 JOIN parking_slot ps ON f.floor_id = ps.floor_id
                           WHERE
-                                  UPPER(TRIM(pl.name)) = UPPER(TRIM(p_name))
+                                  upper(TRIM(pl.name)) = upper(TRIM(p_name))
                               AND NOT EXISTS (
                                   SELECT
                                       1
@@ -236,154 +242,245 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
             raise_application_error(-20002, 'Unexpected error while normalizing timestamp: ');
     END flexiblenormalizetimestamp;
 
-
-
-
     PROCEDURE show_available_slots_by_lot_and_time (
-    p_name       VARCHAR,
-    p_start_time VARCHAR,
-    p_end_time   VARCHAR
-) IS
-    v_start_time TIMESTAMP;
-    v_end_time   TIMESTAMP;
+        p_name       VARCHAR,
+        p_start_time VARCHAR,
+        p_end_time   VARCHAR
+    ) IS
 
-    v_cursor            SYS_REFCURSOR;
-    v_parking_slot_name VARCHAR2(50);
-    v_floor_level       VARCHAR2(50);
-    v_max_height        NUMBER;
-    v_lot_name          VARCHAR2(50);
-    v_price_per_hour    NUMBER;
-    v_duration_hours    NUMBER;
-    v_approx_cost       NUMBER;
-    v_lot_count         NUMBER;
+        v_start_time        TIMESTAMP;
+        v_end_time          TIMESTAMP;
+        v_cursor            SYS_REFCURSOR;
+        v_parking_slot_name VARCHAR2(50);
+        v_floor_level       VARCHAR2(50);
+        v_max_height        NUMBER;
+        v_lot_name          VARCHAR2(50);
+        v_price_per_hour    NUMBER;
+        v_duration_hours    NUMBER;
+        v_approx_cost       NUMBER;
+        v_lot_count         NUMBER;
+        v_duration_minutes  NUMBER;
 
     -- Define an exception for invalid date formats
-    e_invalid_date_format EXCEPTION;
-    PRAGMA EXCEPTION_INIT(e_invalid_date_format, -01830); -- ORA-01830: date format picture ends before converting entire input string
-BEGIN
-    -- Attempt to convert string dates to TIMESTAMP
+        e_invalid_date_format EXCEPTION;
     BEGIN
-        v_start_time := TO_TIMESTAMP(p_start_time, 'YYYY-MM-DD HH:MI AM');
-        v_end_time := TO_TIMESTAMP(p_end_time, 'YYYY-MM-DD HH:MI AM');
-    EXCEPTION
-        WHEN e_invalid_date_format OR VALUE_ERROR THEN
-            DBMS_OUTPUT.PUT_LINE('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
+    -- Attempt to convert string dates to TIMESTAMP
+        BEGIN
+            v_start_time := TO_TIMESTAMP ( p_start_time, 'YYYY-MM-DD HH:MI AM' );
+            v_end_time := TO_TIMESTAMP ( p_end_time, 'YYYY-MM-DD HH:MI AM' );
+            dbms_output.put_line('The start time is done' || v_start_time);
+        EXCEPTION
+            WHEN OTHERS THEN
+                dbms_output.put_line('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
+                RETURN;
+        END;
+
+        IF v_start_time > v_end_time THEN
+            dbms_output.put_line('Start time cannot be greater than end time.');
             RETURN;
-    END;
+        END IF;
 
     -- Validate time increments (on the hour or half-hour)
-    IF (EXTRACT(MINUTE FROM v_start_time) NOT IN (0, 30)) THEN
-        DBMS_OUTPUT.PUT_LINE('Start time must be on the hour or half-hour.');
-        RETURN;
-    END IF;
+        IF ( EXTRACT(MINUTE FROM v_start_time) NOT IN ( 0, 30 ) ) THEN
+            dbms_output.put_line('Start time must be on the hour or half-hour.');
+            RETURN;
+        END IF;
 
-    IF (EXTRACT(MINUTE FROM v_end_time) NOT IN (0, 30)) THEN
-        DBMS_OUTPUT.PUT_LINE('End time must be on the hour or half-hour.');
-        RETURN;
-    END IF;
+        IF ( EXTRACT(MINUTE FROM v_end_time) NOT IN ( 0, 30 ) ) THEN
+            dbms_output.put_line('End time must be on the hour or half-hour.');
+            RETURN;
+        END IF;
 
     -- Validate minimum duration (at least 1 hour)
-    v_duration_hours := EXTRACT(HOUR FROM (v_end_time - v_start_time)) +
-                        ROUND(EXTRACT(MINUTE FROM (v_end_time - v_start_time)) / 60.0);
-	DBMS_OUTPUT.PUT_LINE('The booking duration is ' || v_duration_hours);
-    IF v_duration_hours < 1 THEN
-        DBMS_OUTPUT.PUT_LINE('The booking duration should be at least 1 hour.');
-        RETURN;
-    END IF;
+        v_duration_hours := extract(HOUR FROM ( v_end_time - v_start_time )) + round(extract(MINUTE FROM(v_end_time - v_start_time)) / 60.0
+        );
+
+        dbms_output.put_line('The booking duration is ' || v_duration_hours);
+	
+	
+    -- Calculate the duration between start time and end time in minutes
+        v_duration_minutes := extract(HOUR FROM ( v_end_time - v_start_time )) * 60 + extract(MINUTE FROM ( v_end_time - v_start_time
+        ));
+
+-- Validate minimum booking duration (at least 1 hour)
+        IF v_duration_minutes < 60 THEN
+            dbms_output.put_line('The minimum slot booking duration is 1 hour.');
+            RETURN;
+        END IF;
 
     -- Check if the lot name exists
-    SELECT COUNT(*) INTO v_lot_count FROM parking_lot WHERE UPPER(name) = UPPER(p_name);
-    IF v_lot_count = 0 THEN
-        DBMS_OUTPUT.PUT_LINE('Please enter the correct lot name. No lot name matched as per the input');
-        RETURN;
-    END IF;
+        SELECT
+            COUNT(*)
+        INTO v_lot_count
+        FROM
+            parking_lot
+        WHERE
+            upper(name) = upper(p_name);
+
+        IF v_lot_count = 0 THEN
+            dbms_output.put_line('Please enter the correct lot name. No lot name matched as per the input');
+            RETURN;
+        END IF;
 
     -- Fetch available slots
-    v_cursor := available_slots_by_lot_and_time(p_name, v_start_time, v_end_time);
+        v_cursor := available_slots_by_lot_and_time(p_name, v_start_time, v_end_time);
 
     -- Print column headers
-    DBMS_OUTPUT.PUT_LINE(RPAD('Parking Slot Name', 20) ||
-                         RPAD('Floor Level', 30) ||
-                         RPAD('Max Height', 15) ||
-                         RPAD('Lot Name', 15) ||
-                         RPAD('Estimated Price', 15));
-    DBMS_OUTPUT.PUT_LINE(RPAD('-', 20, '-') ||
-                         RPAD('-', 30, '-') ||
-                         RPAD('-', 15, '-') ||
-                         RPAD('-', 15, '-') ||
-                         RPAD('-', 15, '-'));
+        dbms_output.put_line(rpad('Parking Slot Name', 20)
+                             || rpad('Floor Level', 30)
+                             || rpad('Max Height', 15)
+                             || rpad('Lot Name', 15)
+                             || rpad('Estimated Price', 15));
+
+        dbms_output.put_line(rpad('-', 20, '-')
+                             || rpad('-', 30, '-')
+                             || rpad('-', 15, '-')
+                             || rpad('-', 15, '-')
+                             || rpad('-', 15, '-'));
 
     -- Display results
-    LOOP
-        FETCH v_cursor INTO v_parking_slot_name, v_floor_level, v_max_height, v_lot_name, v_price_per_hour;
-        EXIT WHEN v_cursor%NOTFOUND;
+        LOOP
+            FETCH v_cursor INTO
+                v_parking_slot_name,
+                v_floor_level,
+                v_max_height,
+                v_lot_name,
+                v_price_per_hour;
+            EXIT WHEN v_cursor%notfound;
         
         -- Calculate the approximate cost
-        v_approx_cost := v_duration_hours * v_price_per_hour;
+            v_approx_cost := v_duration_hours * v_price_per_hour;
         
         -- Format each column to align text and ensure the table looks tidy
-        DBMS_OUTPUT.PUT_LINE(LPAD(v_parking_slot_name, 20) ||
-                             RPAD(v_floor_level, 30) ||
-                             LPAD(TO_CHAR(v_max_height, '999.99'), 15) ||
-                             LPAD(v_lot_name, 15) ||
-                             LPAD(TO_CHAR(v_approx_cost, 'FM99990.00'), 15));
+            dbms_output.put_line(lpad(v_parking_slot_name, 20)
+                                 || rpad(v_floor_level, 30)
+                                 || lpad(to_char(v_max_height, '999.99'), 15)
+                                 || lpad(v_lot_name, 15)
+                                 || lpad(to_char(v_approx_cost, 'FM99990.00'), 15));
 
-    END LOOP;
+        END LOOP;
 
     -- Close the cursor
-    CLOSE v_cursor;
-EXCEPTION
-    WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE('No Data Found for lot or other error: ' || SQLERRM);
+        CLOSE v_cursor;
+    EXCEPTION
+        WHEN OTHERS THEN
+            dbms_output.put_line('No Data Found for lot or other error: ' || sqlerrm);
         -- Close cursor if open and error occurs
-        IF v_cursor%ISOPEN THEN
-            CLOSE v_cursor;
-        END IF;
-        RAISE;
-END show_available_slots_by_lot_and_time;
+            IF v_cursor%isopen THEN
+                CLOSE v_cursor;
+            END IF;
+            RAISE;
+    END show_available_slots_by_lot_and_time;
 
     PROCEDURE book_parking_slot (
         p_slot_name        VARCHAR,
         p_floor_level      VARCHAR,
         p_lot_name         VARCHAR,
         p_vehicle_reg_no   VARCHAR,
-        p_start_time       TIMESTAMP,
-        p_end_time         TIMESTAMP,
+        p_start_time       VARCHAR,
+        p_end_time         VARCHAR,
         p_transaction_type VARCHAR,
         p_amount           NUMBER
     ) IS
-        v_parking_slot_id NUMBER;
-        v_price_per_hour  NUMBER;
-        v_hours           NUMBER;
-        v_payment_id      NUMBER;
-        v_expected_amount NUMBER;
-        v_duration_hours  NUMBER; -- To store the duration in hours
+
+        v_parking_slot_id  NUMBER;
+        v_price_per_hour   NUMBER;
+        v_hours            NUMBER;
+        v_hours_1          NUMBER;
+        v_hours_2          NUMBER;
+        v_payment_id       NUMBER;
+        v_expected_amount  NUMBER;
+        v_duration_hours   NUMBER;
+        v_duration_minutes NUMBER;
+        v_start_time       TIMESTAMP;
+        v_end_time         TIMESTAMP;
+        v_lot_count        NUMBER;
+        v_floor_count      NUMBER;
+        v_booking_id       NUMBER;
+		
+
+    -- Define an exception for invalid date formats
+        e_invalid_date_format EXCEPTION;
     BEGIN
-    -- Calculate duration in hours
-        v_duration_hours := extract(HOUR FROM ( p_end_time - p_start_time )) + extract(MINUTE FROM ( p_end_time - p_start_time )) / 60.0
-        ;
+        BEGIN
+            v_start_time := TO_TIMESTAMP ( p_start_time, 'YYYY-MM-DD HH:MI AM' );
+            v_end_time := TO_TIMESTAMP ( p_end_time, 'YYYY-MM-DD HH:MI AM' );
+			--dbms_output.put_line('The start time is done' || v_start_time);
+        EXCEPTION
+            WHEN OTHERS THEN
+                dbms_output.put_line('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
+                RETURN;
+        END;
 
-    -- Validate minimum booking duration
-        IF v_duration_hours < 1 THEN
-            raise_application_error(-20004, 'Minimum booking duration is 1 hour.');
+        IF v_start_time > v_end_time THEN
+            dbms_output.put_line('Start time cannot be greater than end time.');
+            RETURN;
         END IF;
 
+    -- Validate time increments (on the hour or half-hour)
+        IF ( EXTRACT(MINUTE FROM v_start_time) NOT IN ( 0, 30 ) ) THEN
+            dbms_output.put_line('Start time must be on the hour or half-hour.');
+            RETURN;
+        END IF;
+
+        IF ( EXTRACT(MINUTE FROM v_end_time) NOT IN ( 0, 30 ) ) THEN
+            dbms_output.put_line('End time must be on the hour or half-hour.');
+            RETURN;
+        END IF;
+
+    -- Validate minimum duration (at least 1 hour)
+        v_duration_hours := extract(HOUR FROM ( v_end_time - v_start_time )) + round(extract(MINUTE FROM(v_end_time - v_start_time)) / 60.0
+        );
+
+        --dbms_output.put_line('The booking duration is ' || v_duration_hours);
+	
+	
+    -- Calculate the duration between start time and end time in minutes
+        v_duration_minutes := extract(HOUR FROM ( v_end_time - v_start_time )) * 60 + extract(MINUTE FROM ( v_end_time - v_start_time
+        ));
+
+-- Validate minimum booking duration (at least 1 hour)
+        IF v_duration_minutes < 60 THEN
+            dbms_output.put_line('The minimum slot booking duration is 1 hour.');
+            RETURN;
+        END IF;
+
+    -- Check if the lot name exists
+        SELECT
+            COUNT(*)
+        INTO v_lot_count
+        FROM
+            parking_lot
+        WHERE
+            upper(name) = upper(p_lot_name);
+
+        IF v_lot_count = 0 THEN
+            dbms_output.put_line('Please enter the correct lot name. No lot name matched as per the input');
+            RETURN;
+        END IF;
+		
+		-- Check if the floor name exists
+        SELECT
+            COUNT(*)
+        INTO v_floor_count
+        FROM
+            floor
+        WHERE
+            upper(floor_level) = upper(p_floor_level);
+
+        IF v_floor_count = 0 THEN
+            dbms_output.put_line('Please enter the correct Floor level name. No floor name matched as per the input');
+            RETURN;
+        END IF;
+		
+		
     -- Validate transaction type
-        IF trim(lower(p_transaction_type)) NOT IN ( 'debit', 'credit' ) THEN
-            raise_application_error(-20001, 'Transaction type must be "debit" or "credit".');
+        IF TRIM(lower(p_transaction_type)) NOT IN ( 'debit', 'credit' ) THEN
+            dbms_output.put_line('Transaction type must be "debit" or "credit".');
+            RETURN;
         END IF;
 
-    -- Validate start and end time increments
-        IF ( EXTRACT(MINUTE FROM p_start_time) NOT IN ( 0, 30 ) ) OR ( EXTRACT(MINUTE FROM
-        p_end_time) NOT IN ( 0, 30 ) ) THEN
-            raise_application_error(-20002, 'Start and end times must be on the hour or half-hour.');
-        END IF;
-
-    -- Ensure start time is before end time
-        IF p_start_time >= p_end_time THEN
-            raise_application_error(-20003, 'Start time must be before end time.');
-        END IF;
-
+ 
     -- Lookup slot ID and pricing
         SELECT
             ps.parking_slot_id,
@@ -396,16 +493,17 @@ END show_available_slots_by_lot_and_time;
             JOIN floor       f ON f.floor_id = ps.floor_id
             JOIN parking_lot pl ON pl.parking_lot_id = f.parking_lot_id
         WHERE
-                ps.slot_name = p_slot_name
-            AND f.floor_level = p_floor_level
-            AND pl.name = p_lot_name;
+                upper(TRIM(ps.slot_name)) = upper(TRIM(p_slot_name))
+            AND upper(TRIM(f.floor_level)) = upper(TRIM(p_floor_level))
+            AND upper(TRIM(pl.name)) = upper(TRIM(p_lot_name));
 
-        dbms_output.put_line('Slot ID selected');
+        --dbms_output.put_line('Slot ID selected' || v_parking_slot_id);
 
     -- Calculate the expected payment amount
         v_expected_amount := v_duration_hours * v_price_per_hour;
         IF p_amount != v_expected_amount THEN
-            raise_application_error(-20005, 'Incorrect payment amount.');
+            dbms_output.put_line('Incorrect payment amount. Price doesnt match ');
+            RETURN;
         END IF;
 
     -- Insert payment information first
@@ -420,6 +518,45 @@ END show_available_slots_by_lot_and_time;
             systimestamp,
             p_amount
         ) RETURNING payment_id INTO v_payment_id;
+		--dbms_output.put_line('Payment successful');
+		
+		-- Check if the vehicle is present 
+        SELECT
+            COUNT(*)
+        INTO v_hours_2
+        FROM
+            vehicle
+        WHERE
+            registration_no = p_vehicle_reg_no;
+
+        IF v_hours_2 = 0 THEN
+            dbms_output.put_line('Vehicle not found. Please add vehicle first.');
+            RETURN;
+        END IF;
+		
+		
+		-- Check if the slot is already booked for the requested time for the same vehicle ID
+        SELECT
+            COUNT(*)
+        INTO v_hours_1
+        FROM
+            slot_booking
+        WHERE
+                vehicle_id = (
+                    SELECT
+                        vehicle_id
+                    FROM
+                        vehicle
+                    WHERE
+                        registration_no = p_vehicle_reg_no
+                )
+            AND NOT ( scheduled_end_time <= v_start_time
+                      OR scheduled_start_time >= v_end_time );
+
+        IF v_hours_1 > 0 THEN
+            dbms_output.put_line('The slot is already booked for the requested time for the same vehicle.');
+            RETURN;
+        END IF;
 
     -- Check slot availability
         SELECT
@@ -429,13 +566,17 @@ END show_available_slots_by_lot_and_time;
             slot_booking
         WHERE
                 parking_slot_id = v_parking_slot_id
-            AND NOT ( scheduled_end_time <= p_start_time
-                      OR scheduled_start_time >= p_end_time );
-
+            AND NOT ( scheduled_end_time <= v_start_time
+                      OR scheduled_start_time >= v_end_time );
+		--dbms_output.put_line('Slot booking count is ' || v_hours);
         IF v_hours > 0 THEN
-            raise_application_error(-20006, 'The slot is already booked for the requested time.');
+            dbms_output.put_line('The slot is already booked for the requested time. Please check for a different slot');
+            RETURN;
         END IF;
-
+		
+		--dbms_output.put_line('Scheduled start time is' || v_start_time);
+		--dbms_output.put_line('Schedule end time is' || v_end_time);
+	
     -- Insert booking details
         INSERT INTO slot_booking (
             slot_booking_id,
@@ -447,8 +588,8 @@ END show_available_slots_by_lot_and_time;
         ) VALUES (
             slot_booking_val.NEXTVAL,
             v_parking_slot_id,
-            p_start_time,
-            p_end_time,
+            v_start_time,
+            v_end_time,
             v_payment_id,
             (
                 SELECT
@@ -458,14 +599,17 @@ END show_available_slots_by_lot_and_time;
                 WHERE
                     registration_no = p_vehicle_reg_no
             )
-        );
+        ) RETURNING slot_booking_id INTO v_booking_id;
+
+-- Display the slot_booking_id
+        dbms_output.put_line('Booking successful. Slot Booking ID: ' || v_booking_id);
 
     -- Commit the transaction to save the booking and payment
         COMMIT;
     EXCEPTION
         WHEN no_data_found THEN
             ROLLBACK;
-            raise_application_error(-20007, 'Invalid slot, floor, lot name, or vehicle registration number provided.');
+            dbms_output.put_line('Invalid slot, floor, lot name, or vehicle registration number or payment amount provided.');
         WHEN OTHERS THEN
             ROLLBACK;
             RAISE;
@@ -474,7 +618,22 @@ END show_available_slots_by_lot_and_time;
     PROCEDURE view_customer_booking_history (
         p_email VARCHAR
     ) IS
+        v_booking_count NUMBER;
     BEGIN
+        SELECT
+            COUNT(*)
+        INTO v_booking_count
+        FROM
+                 slot_booking sb
+            JOIN vehicle  v ON sb.vehicle_id = v.vehicle_id
+            JOIN customer c ON v.customer_id = c.customer_id
+        WHERE
+            c.email = p_email;
+
+        -- If no bookings found, raise no_data_found exception
+        IF v_booking_count = 0 THEN
+            RAISE no_data_found;
+        END IF;
         FOR r IN (
             SELECT
                 c.email,
@@ -542,24 +701,138 @@ END show_available_slots_by_lot_and_time;
                 ELSE 'Yet to check in'
             END);
         END LOOP;
+
     EXCEPTION
         WHEN no_data_found THEN
             dbms_output.put_line('No bookings found for the specified email.');
         WHEN OTHERS THEN
-            dbms_output.put_line('Error occurred: ' || sqlerrm);
+            dbms_output.put_line('Error occurred');
         -- Re-raise the exception
             RAISE;
     END view_customer_booking_history;
 
+    PROCEDURE cancel_booking (
+        p_booking_id         NUMBER,
+        cancel_initiate_time VARCHAR
+    ) IS
+        v_checked_in    NUMBER;
+        v_payment_id    NUMBER;
+        v_booking_count NUMBER;
+        v_start_time    TIMESTAMP;
+        v_time_diff     NUMBER;
+        v_cancel_time   TIMESTAMP;
+    BEGIN
+    -- Check if the booking ID exists
+        SELECT
+            COUNT(*)
+        INTO v_checked_in
+        FROM
+            check_in
+        WHERE
+            slot_booking_id = p_booking_id;
+
+        BEGIN
+            v_cancel_time := TO_TIMESTAMP ( cancel_initiate_time, 'YYYY-MM-DD HH:MI AM' );
+        EXCEPTION
+            WHEN OTHERS THEN
+                dbms_output.put_line('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
+                RETURN;
+        END;
+
+        IF v_checked_in > 0 THEN
+        -- Booking has been checked in, cannot cancel
+            dbms_output.put_line('Cannot cancel booking because check-in has already occurred.');
+            RETURN;
+        ELSE
+            BEGIN
+                SELECT
+                    COUNT(*)
+                INTO v_booking_count
+                FROM
+                    slot_booking
+                WHERE
+                    slot_booking_id = p_booking_id;
+
+                IF v_booking_count = 0 THEN
+                -- Slot booking ID does not exist
+                    dbms_output.put_line('Invalid slot booking ID provided.');
+                    RETURN;
+                ELSE
+                -- Retrieve the start time of the booking
+                    SELECT
+                        scheduled_start_time,
+                        payment_id
+                    INTO
+                        v_start_time,
+                        v_payment_id
+                    FROM
+                        slot_booking
+                    WHERE
+                        slot_booking_id = p_booking_id;
+
+                -- Calculate the difference in minutes between start time and cancellation time
+                    v_time_diff := extract(DAY FROM ( v_start_time - v_cancel_time )) * 1440 + extract(HOUR FROM ( v_start_time - v_cancel_time
+                    )) * 60 + extract(MINUTE FROM ( v_start_time - v_cancel_time ));
+
+                -- Check if the cancellation is initiated less than 120 minutes before start time
+                    IF v_time_diff <= 120 THEN
+                        dbms_output.put_line('Cancellation must be initiated at least 120 minutes before the start time.');
+                        RETURN;
+                    END IF;
+
+                -- Delete the entry from the slot_booking table
+                    DELETE FROM slot_booking
+                    WHERE
+                        slot_booking_id = p_booking_id;
+
+                -- Delete the entry from the payment table
+                    DELETE FROM payment
+                    WHERE
+                        payment_id = v_payment_id;
+
+                -- Commit the transaction
+                    COMMIT;
+
+                -- Display success message
+                    dbms_output.put_line('Booking with ID '
+                                         || p_booking_id
+                                         || ' has been canceled successfully.');
+                END IF;
+
+            EXCEPTION
+                WHEN no_data_found THEN
+                    dbms_output.put_line('Booking with ID '
+                                         || p_booking_id
+                                         || ' not found.');
+                    RETURN;
+            END;
+        END IF;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            dbms_output.put_line('Error occurred while canceling the booking.');
+        -- Rollback the transaction
+            ROLLBACK;
+        -- Re-raise the exception
+            RAISE;
+    END cancel_booking;
+
     PROCEDURE perform_check_in (
         p_slot_booking_id   NUMBER,
-        p_actual_start_time TIMESTAMP
+        p_actual_start_time VARCHAR
     ) IS
         v_scheduled_start_time TIMESTAMP;
         v_scheduled_end_time   TIMESTAMP;
         v_actual_start_time    TIMESTAMP;
         v_count                NUMBER;
     BEGIN
+        BEGIN
+            v_actual_start_time := TO_TIMESTAMP ( p_actual_start_time, 'YYYY-MM-DD HH:MI AM' );
+        EXCEPTION
+            WHEN OTHERS THEN
+                dbms_output.put_line('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
+                RETURN;
+        END;
     -- Check existence and retrieve the scheduled start time
         SELECT
             scheduled_start_time,
@@ -573,8 +846,9 @@ END show_available_slots_by_lot_and_time;
                 slot_booking_id = p_slot_booking_id
             AND ROWNUM = 1; -- Ensure we only get one record in case of unexpected duplicates
 
-        IF p_actual_start_time < v_scheduled_start_time OR p_actual_start_time > v_scheduled_end_time THEN
-            raise_application_error(-20030, 'Check-in time is not within the scheduled time window.');
+        IF v_actual_start_time < v_scheduled_start_time OR v_actual_start_time > v_scheduled_end_time THEN
+            dbms_output.put_line('Check-in time is not within the scheduled time window.');
+            RETURN;
         END IF;
 
     -- Ensure there is no prior incomplete check-in (no check-out)
@@ -588,7 +862,8 @@ END show_available_slots_by_lot_and_time;
             AND actual_end_time IS NULL;
 
         IF v_count > 0 THEN
-            raise_application_error(-20031, 'A check-in without a check-out already exists for this booking.');
+            dbms_output.put_line('A check-in without a check-out already exists for this booking.');
+            RETURN;
         END IF;
 
     -- Perform the check-in
@@ -600,14 +875,15 @@ END show_available_slots_by_lot_and_time;
         ) VALUES (
             checkin_val.NEXTVAL,
             p_slot_booking_id,
-            p_actual_start_time,
+            v_actual_start_time,
             NULL
         );
 
         COMMIT;
     EXCEPTION
         WHEN no_data_found THEN
-            raise_application_error(-20032, 'Slot booking ID not found. Please provide a correct booking ID.');
+            dbms_output.put_line('Slot booking ID not found. Please provide a correct booking ID.');
+            RETURN;
         WHEN OTHERS THEN
             dbms_output.put_line('Error occurred: ' || sqlerrm);
             ROLLBACK;
@@ -616,24 +892,40 @@ END show_available_slots_by_lot_and_time;
 
     PROCEDURE perform_check_out (
         p_slot_booking_id NUMBER,
-        p_actual_end_time TIMESTAMP
+        p_actual_end_time VARCHAR
     ) IS
         v_scheduled_end_time    TIMESTAMP;
+        v_actual_end_time       TIMESTAMP;
         v_actual_end_time_check TIMESTAMP;
         v_additional_time       INTERVAL DAY TO SECOND;
+        v_check_in_time         TIMESTAMP;
     BEGIN
-    -- Check existence and retrieve the scheduled end time
+    -- Convert actual end time from string to TIMESTAMP
+        BEGIN
+            v_actual_end_time := TO_TIMESTAMP ( p_actual_end_time, 'YYYY-MM-DD HH:MI AM' );
+        EXCEPTION
+            WHEN OTHERS THEN
+                dbms_output.put_line('Date format is not correct. Accepted formats: YYYY-MM-DD HH:MI AM/PM');
+                RETURN;
+        END;
+
+    -- Check existence and retrieve the scheduled end time and check-in time
         SELECT
-            scheduled_end_time
-        INTO v_scheduled_end_time
+            scheduled_end_time,
+            actual_start_time
+        INTO
+            v_scheduled_end_time,
+            v_check_in_time
         FROM
-            slot_booking
+                 slot_booking
+            JOIN check_in ON slot_booking.slot_booking_id = check_in.slot_booking_id
         WHERE
-            slot_booking_id = p_slot_booking_id;
+            slot_booking.slot_booking_id = p_slot_booking_id;
 
     -- Check if the slot booking ID is not available
         IF v_scheduled_end_time IS NULL THEN
-            raise_application_error(-20030, 'Slot booking ID not found.');
+            dbms_output.put_line('Slot booking ID not found.');
+            RETURN;
         END IF;
 
     -- Check if actual end time is already populated
@@ -646,96 +938,118 @@ END show_available_slots_by_lot_and_time;
             slot_booking_id = p_slot_booking_id;
 
         IF v_actual_end_time_check IS NOT NULL THEN
-            raise_application_error(-20031, 'End time already populated.');
+            dbms_output.put_line('End time already populated. This is duplicate check out.');
+            RETURN;
+        END IF;
+
+    -- Validate if checkout time is greater than check-in time
+        IF v_actual_end_time <= v_check_in_time THEN
+            dbms_output.put_line('Check out time must be greater than check in time.');
+            RETURN;
         END IF;
 
     -- Calculate additional time if actual end time is greater than scheduled end time
-        IF p_actual_end_time > v_scheduled_end_time THEN
-            v_additional_time := p_actual_end_time - v_scheduled_end_time;
-            dbms_output.put_line('Additional time: ' || v_additional_time);
+        IF v_actual_end_time > v_scheduled_end_time THEN
+            v_additional_time := v_actual_end_time - v_scheduled_end_time;
+            dbms_output.put_line('Additional time: '
+                                 || extract(HOUR FROM v_additional_time)
+                                 || ' Hours '
+                                 || extract(MINUTE FROM v_additional_time)
+                                 || ' Minutes');
+
         END IF;
 
     -- Update the check-in record with check-out time
         UPDATE check_in
         SET
-            actual_end_time = p_actual_end_time
+            actual_end_time = v_actual_end_time
         WHERE
             slot_booking_id = p_slot_booking_id;
 
         COMMIT;
     EXCEPTION
         WHEN no_data_found THEN
-            raise_application_error(-20032, 'Slot booking ID not found.');
+            dbms_output.put_line('Slot booking ID or Check-in record not found.');
+            RETURN;
         WHEN OTHERS THEN
-            dbms_output.put_line('Error occurred: ' || sqlerrm);
+            dbms_output.put_line('Error occurred');
             ROLLBACK;
             RAISE;
     END perform_check_out;
 
     PROCEDURE submit_feedback (
-        p_slot_booking_id NUMBER,
-        p_rating          NUMBER,
-        p_comments        VARCHAR2
-    ) AS
-        v_check_in_id NUMBER;
-        v_word_count  INT;
-    BEGIN
+    p_slot_booking_id NUMBER,
+    p_rating          NUMBER,
+    p_comments        VARCHAR2
+) AS
+    v_check_in_id NUMBER;
+    v_word_count  INT;
+    v_feedback_exists NUMBER;
+BEGIN
 
-    -- Check if the customer has checked in
-        SELECT
-            check_in_id
-        INTO v_check_in_id
-        FROM
-            check_in
-        WHERE
-                slot_booking_id = p_slot_booking_id
-            AND ROWNUM = 1;  -- Ensures only one row is returned
+-- Check if the customer has checked in
+    SELECT check_in_id
+    INTO v_check_in_id
+    FROM check_in
+    WHERE slot_booking_id = p_slot_booking_id
+	AND ACTUAL_END_TIME IS NOT NULL
+    AND ROWNUM = 1;  -- Ensures only one row is returned
 
-    -- If no check-in record is found, print an error message
-        IF v_check_in_id IS NULL THEN
-            dbms_output.put_line('Error: No check-in record found for the provided booking ID. Only checked-in customers can provide feedback.'
-            );
-            RETURN;
-        END IF;
+-- If no check-in record is found, print an error message
+    IF v_check_in_id IS NULL THEN
+        dbms_output.put_line('No check-in record found for the provided booking ID. Only checked-in customers can provide feedback.');
+        RETURN;
+    END IF;
 
-    -- Validate the rating
-        IF p_rating < 1 OR p_rating > 5 THEN
-            dbms_output.put_line('Error: Rating must be between 1 and 5.');
-            RETURN;
-        END IF;
+-- Check if feedback has already been provided
+    SELECT COUNT(*)
+    INTO v_feedback_exists
+    FROM feedback
+    WHERE check_in_id = v_check_in_id;
 
-    -- Validate the comment word count
-        SELECT
-            length(regexp_replace(p_comments, '\s+', ' ')) - length(replace(regexp_replace(p_comments, '\s+', ' '),
-                                                                            ' ',
-                                                                            '')) + 1
-        INTO v_word_count
-        FROM
-            dual;
+    IF v_feedback_exists > 0 THEN
+        dbms_output.put_line('Feedback has already been provided for this booking.');
+        RETURN;
+    END IF;
 
-        IF v_word_count > 255 THEN
-            dbms_output.put_line('Error: Comments should not exceed 255 words.');
-            RETURN;
-        END IF;
+-- Validate the rating
+    IF p_rating < 1 OR p_rating > 5 THEN
+        dbms_output.put_line('Rating must be between 1 and 5.');
+        RETURN;
+    END IF;
 
-    -- Insert the feedback
-        INSERT INTO feedback (
-            feedback_id,
-            rating,
-            comments,
-            check_in_id
-        ) VALUES (
-            feedback_val.NEXTVAL,
-            p_rating,
-            p_comments,
-            v_check_in_id
-        );
+-- Validate the comment word count
+    SELECT length(regexp_replace(p_comments, '\s+', ' ')) - length(replace(regexp_replace(p_comments, '\s+', ' '), ' ', '')) + 1
+    INTO v_word_count
+    FROM dual;
 
-        dbms_output.put_line('Feedback submitted successfully.');
-    EXCEPTION
-        WHEN OTHERS THEN
-            dbms_output.put_line('Unexpected error: ' || sqlerrm);
-    END submit_feedback;
+    IF v_word_count > 255 THEN
+        dbms_output.put_line('Comments should not exceed 255 words.');
+        RETURN;
+    END IF;
+
+-- Insert the feedback
+    INSERT INTO feedback (
+        feedback_id,
+        rating,
+        comments,
+        check_in_id
+    ) VALUES (
+        FEEDBACK_VAL.NEXTVAL, 
+        p_rating,
+        p_comments,
+        v_check_in_id
+    );
+
+    COMMIT;  -- Ensure changes are committed
+
+    dbms_output.put_line('Feedback submitted successfully.');
+
+EXCEPTION
+    WHEN OTHERS THEN
+        dbms_output.put_line('Unexpected error: ' );
+        ROLLBACK;  -- Rollback changes on error
+END submit_feedback;
 
 END spms_slot_booking_pkg;
 /
