@@ -852,6 +852,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         v_scheduled_end_time   TIMESTAMP;
         v_actual_start_time    TIMESTAMP;
         v_count                NUMBER;
+		v_count_1              NUMBER;
     BEGIN
         BEGIN
             v_actual_start_time := TO_TIMESTAMP ( p_actual_start_time, 'YYYY-MM-DD HH:MI AM' );
@@ -877,6 +878,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
             dbms_output.put_line('Check-in time is not within the scheduled time window.');
             RETURN;
         END IF;
+		
 
     -- Ensure there is no prior incomplete check-in (no check-out)
         SELECT
@@ -890,6 +892,21 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
 
         IF v_count > 0 THEN
             dbms_output.put_line('A check-in without a check-out already exists for this booking.');
+            RETURN;
+        END IF;
+		
+	--Ensure there is no duplicate check in 
+		SELECT
+            COUNT(*)
+        INTO v_count_1
+        FROM
+            check_in
+        WHERE
+                slot_booking_id = p_slot_booking_id
+        ;
+
+        IF v_count_1 > 0 THEN
+            dbms_output.put_line('A check-in for this slot book id has already occurred.');
             RETURN;
         END IF;
 
