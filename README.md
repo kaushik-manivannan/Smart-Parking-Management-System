@@ -39,7 +39,7 @@ Utilize SQL Developer to connect to the database using the PLADMIN credentials.
 - **PL_MANAGER1 Views** (`9_MANAGER_VIEWS.sql`): Navigate to PL_MANAGER1 to manage and oversee parking operations.
 
 ### Step 10: Execute Package Scripts for Enhanced Functionality
-- Execute the below scripts in the following order:
+#### Execute the below scripts in the following order:
 - **Manager Functions Package** (`12_Manager_functions_package.sql`): Execute to enable advanced functionalities for parking lot managers.
 - **User Management Packages** (`10_User_management_packages.sql`): Implement additional user management capabilities.
 - **Slot Booking Package** (`11_Slot_booking_package.sql`): Enhance the slot booking features with this script.
