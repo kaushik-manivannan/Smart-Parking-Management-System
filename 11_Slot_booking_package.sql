@@ -1,3 +1,8 @@
+SET SERVEROUTPUT ON;
+SET AUTOCOMMIT OFF;
+CLEAR SCREEN;
+
+
 CREATE OR REPLACE PACKAGE spms_slot_booking_pkg AS
 
   -- Check available parking slots in nearby parking lots
@@ -264,6 +269,11 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
     -- Define an exception for invalid date formats
         e_invalid_date_format EXCEPTION;
     BEGIN
+	
+	IF ( p_start_time is NULL )OR (p_end_time is NULL ) THEN
+            dbms_output.put_line('Start time and End time must be provided.');
+            RETURN;
+        END IF;
     -- Attempt to convert string dates to TIMESTAMP
         BEGIN
             v_start_time := TO_TIMESTAMP ( p_start_time, 'YYYY-MM-DD HH:MI AM' );
@@ -409,6 +419,13 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
     -- Define an exception for invalid date formats
         e_invalid_date_format EXCEPTION;
     BEGIN
+	
+	
+		IF ( p_start_time is NULL )OR (p_end_time is NULL ) THEN
+            dbms_output.put_line('Start time and End time must be provided.');
+            RETURN;
+        END IF;
+		
         BEGIN
             v_start_time := TO_TIMESTAMP ( p_start_time, 'YYYY-MM-DD HH:MI AM' );
             v_end_time := TO_TIMESTAMP ( p_end_time, 'YYYY-MM-DD HH:MI AM' );
