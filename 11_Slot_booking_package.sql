@@ -629,7 +629,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         ) RETURNING slot_booking_id INTO v_booking_id;
 
 -- Display the slot_booking_id
-        dbms_output.put_line('Booking successful. Slot Booking ID: ' || v_booking_id);
+        dbms_output.put_line('Booking successful. Slot Booking ID: ' || v_booking_id || '. Please use this ID to check in and check out your vehicle as well as to submit your feedback.');
 
     -- Commit the transaction to save the booking and payment
         COMMIT;
@@ -907,6 +907,8 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         );
 
         COMMIT;
+        -- Display success message
+        dbms_output.put_line('You have checked in successfully!');
     EXCEPTION
         WHEN no_data_found THEN
             dbms_output.put_line('Slot booking ID not found. Please provide a correct booking ID.');
@@ -978,6 +980,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
     -- Calculate additional time if actual end time is greater than scheduled end time
         IF v_actual_end_time > v_scheduled_end_time THEN
             v_additional_time := v_actual_end_time - v_scheduled_end_time;
+            dbms_output.put_line('You have checked out successfully!');
             dbms_output.put_line('Additional time: '
                                  || extract(HOUR FROM v_additional_time)
                                  || ' Hours '
