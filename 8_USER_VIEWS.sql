@@ -1,7 +1,8 @@
 --LOGIN AS USER PL_USER1
 --EXECUTION ORDER: 8
 
-
+set SERVEROUTPUT on
+CLEAR SCREEN;
 
 
 --To display the vehicles belonging to the customer

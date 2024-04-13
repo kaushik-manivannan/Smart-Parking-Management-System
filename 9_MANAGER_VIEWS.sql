@@ -1,6 +1,7 @@
 --LOGIN AS PL_MANAGER1 
 --EXECUTION ORDER : 9
-
+set SERVEROUTPUT on
+CLEAR SCREEN;
 
 
 --- To display parking_slots_filled at particular time. For View and testing purpose we have hardcoded a particular time interval

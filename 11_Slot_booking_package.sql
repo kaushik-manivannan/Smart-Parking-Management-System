@@ -1,3 +1,6 @@
+--LOGIN AS :- PLADMIN
+--EXECUTION :- 12
+
 SET SERVEROUTPUT ON;
 SET AUTOCOMMIT OFF;
 CLEAR SCREEN;
@@ -1104,7 +1107,7 @@ CREATE OR REPLACE PACKAGE BODY spms_slot_booking_pkg AS
         dbms_output.put_line('Feedback submitted successfully.');
     EXCEPTION
         WHEN OTHERS THEN
-            dbms_output.put_line('Unexpected error: ');
+            dbms_output.put_line('Check ID or Slot ID  not found ');
             ROLLBACK;  -- Rollback changes on error
     END submit_feedback;
 

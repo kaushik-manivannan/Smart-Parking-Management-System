@@ -11,13 +11,15 @@ BEGIN
     SELECT COUNT(*) INTO V_active_sess FROM V$SESSION 
     WHERE USERNAME IN ('PLADMIN', 
                        'PL_USER1',
-                       'PL_MANAGER1');
+                       'PL_MANAGER1'
+					   ,'PL_USER2');
     IF (V_active_sess>=1) THEN
         FOR I IN (
             SELECT sid AS V_sid,serial# AS V_serial, username as usern FROM V$SESSION 
             WHERE USERNAME IN ('PLADMIN', 
 							   'PL_USER1',
-                               'PL_MANAGER1')
+                               'PL_MANAGER1',
+							   'PL_USER2')
         ) LOOP
         BEGIN
             EXECUTE IMMEDIATE 'ALTER SYSTEM KILL SESSION ' || CHR(39) || I.V_sid || ',' || I.V_serial || CHR(39) || ' IMMEDIATE';

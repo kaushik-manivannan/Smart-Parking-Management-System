@@ -2,51 +2,53 @@
 --Execution Order: 
 --Execute using user: AS USER
 SET SERVEROUTPUT ON;
-SET AUTOCOMMIT OFF;
+SET AUTOCOMMIT ON;
 --CUSTMER ONBOARDIGN AND MANAGEMENT
 
 -- Customer Creation procedure Test cases
 -- customer creation
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen12@gmail.com','Henrick123','8574059622');
+EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen12@gmail.com','Henrick123','8574059622');
 -- customer creation with other email but same mobile number  
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen123@gmail.com','Henrick123q','8574059622');
+EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('Henrick','Klassen','henrickklassen123@gmail.com','Henrick123q','8574059622');
 -- check for duplicate customer with same email
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('Henrick1','Klassen','henrickklassen12@gmail.com','Henrick123q','6173932772');
+EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('Henrick1','Klassen','henrickklassen12@gmail.com','Henrick123q','6173932772');
 -- customer with invalid names
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('','russ','andrerussell@gmail.com','andre123q','6173932772');
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('andre12','russ','andrerussell@gmail.com','andre123q','6173932772');
+EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('','russ','andrerussell@gmail.com','andre123q','6173932772');
+EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('andre12','russ','andrerussell@gmail.com','andre123q','6173932772');
 --customer with all corect values
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('andre','russ','andrerussell@gmail.com','andre123q','6173932772');
+EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('andre','russ','andrerussell@gmail.com','andre123q','6173932772');
 -- customer with invalid password
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('mayank','yadav','mayankyadav@gmail.com','may','6173932772');
+EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('mayank','yadav','mayankyadav@gmail.com','may','6173932772');
 -- customer with invalid phone-number
-EXEC spms_customer_management_pkg.spms_new_customer_insert ('mayank','yadav','mayankyadav@gmail.com','mayyank1','12abc456');
+EXEC PLADMIN.spms_customer_management_pkg.spms_new_customer_insert ('mayank','yadav','mayankyadav@gmail.com','mayyank1','12abc456');
 
 -- vehicle addition procedure
 -- invalid registration number
-EXEC spms_customer_management_pkg.spms_add_vehicle('<script></script>','henrickklassen12@gmail.com');
+EXEC PLADMIN.spms_customer_management_pkg.spms_add_vehicle('<script></script>','henrickklassen12@gmail.com');
 -- add vehicle to the custumer
-EXEC spms_customer_management_pkg.spms_add_vehicle('BEE-419','henrickklassen12@gmail.com');
+EXEC PLADMIN.spms_customer_management_pkg.spms_add_vehicle('BEE-419','henrickklassen12@gmail.com');
 -- check already the vehicle already registered
-EXEC spms_customer_management_pkg.spms_add_vehicle('BEE-419','andrerussell@gmail.com');
+EXEC PLADMIN.spms_customer_management_pkg.spms_add_vehicle('BEE-419','andrerussell@gmail.com');
 
 --EXEC spms_customer_management_pkg.spms_add_vehicle('andrerussell@gmail.com');
 
 -- Update the customer procedure
 -- invalid email
-EXEC spms_customer_management_pkg.spms_customer_update('','','kau@northeastern.edu','passw', 8574059622);
+EXEC PLADMIN.spms_customer_management_pkg.spms_customer_update('','','kau@northeastern.edu','passw', 8574059622);
 --  update passowrd and phone number with alrready existing phone numer - throws error
-EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password', 6173932772);
+EXEC PLADMIN.spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password', 6173932772);
 -- update customer with all correct values 
-EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password', 6173932773);
+EXEC PLADMIN.spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password', 6173932773);
 --EXEC spms_customer_management_pkg.spms_customer_update('','','henrickklassen12@gmail.com','password');
 
 -- SLOT BOOKING MODULES:
 
 
 
+
 /* 1st procedure */
 --show available lots for boston
+SET AUTOCOMMIT OFF;
 
 EXEC PLADMIN.spms_slot_booking_pkg.show_available_lots('BOSTON');
 
@@ -190,7 +192,7 @@ EXEC PLADMIN.spms_slot_booking_pkg.cancel_booking('101','2024-04-14 1:30 AM');
 /* 6th procedure */
 
 --when trying to checkin before 30mins
-EXEC PLADMIN.spms_slot_booking_pkg.perform_check_in (102,'2024-04-15 8:00 AM');
+EXEC PLADMIN.spms_slot_booking_pkg.perform_check_in (100,'2024-04-15 8:30 AM');
 
 
 -- checkin
@@ -207,7 +209,7 @@ EXEC PLADMIN.spms_slot_booking_pkg.perform_check_in (102,'2024-04-13 10:00 AM');
 
 --when providing wrong slot booking id
 
-EXEC PLADMIN.spms_slot_booking_pkg.perform_check_out(106,'2024-04-13 12:30 PM');
+EXEC PLADMIN.spms_slot_booking_pkg.perform_check_out(100,'2024-04-13 12:30 PM');
 
 
 -- when providing correct 
